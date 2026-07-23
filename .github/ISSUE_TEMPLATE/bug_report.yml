@@ -1,0 +1,24 @@
+name: Bug report
+description: Something behaves differently than real Word desktop, or the shim throws unexpectedly.
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Include the operation(s) called and the seed OOXML if possible (or a minimal repro).
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What real Word desktop does in this case, if known.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: office-js-headless version
+    validations:
+      required: true

@@ -1,0 +1,16 @@
+node_modules
+dist
+coverage
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Windows/Mac/Linux
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

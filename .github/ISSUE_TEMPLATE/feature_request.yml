@@ -1,0 +1,11 @@
+name: Feature / API coverage request
+description: Request support for an Office.js API not yet covered.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: api
+    attributes:
+      label: Office.js API needed
+      description: The Word/Office method(s) or property(ies), and the real add-in scenario that needs them.
+    validations:
+      required: true

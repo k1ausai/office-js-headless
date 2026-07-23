@@ -1,0 +1,22 @@
+name: Fidelity gap
+description: The shim's output diverges from what real Word desktop actually produces for a given operation.
+labels: [fidelity-gap]
+body:
+  - type: textarea
+    id: seed
+    attributes:
+      label: Seed OOXML + operation
+      description: The starting document (or a minimal fragment) and the exact call(s) made.
+    validations:
+      required: true
+  - type: textarea
+    id: real-word
+    attributes:
+      label: Real Word desktop's actual output
+      description: Captured getOoxml() output from real Word after the same operation, if you have it — this becomes the golden fixture.
+  - type: textarea
+    id: shim-output
+    attributes:
+      label: Shim's output
+    validations:
+      required: true
