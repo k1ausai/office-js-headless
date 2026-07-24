@@ -19,7 +19,12 @@ export class RequestContext {
   private readonly syncables: Syncable[] = [];
 
   constructor(doc: FlatOpcDocument, platform: SupportedPlatform) {
-    const body = new Body(doc, platform, (op) => this.enqueue(op));
+    const body = new Body(
+      doc,
+      platform,
+      (op) => this.enqueue(op),
+      (obj) => this.registerSyncable(obj)
+    );
     this.document = { body };
     this.registerSyncable(body);
   }
