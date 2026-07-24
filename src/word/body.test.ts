@@ -85,6 +85,19 @@ describe("Body.search", () => {
       expect(context.document.body.search("nonexistent")).toEqual([]);
     });
   });
+
+  it("treats wildcard-special characters in the search text literally, through the public entry point", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, "PC", async (context) => {
+      context.document.body.insertParagraph("Contains * and ? literally.", InsertLocation.end);
+      await context.sync();
+
+      expect(context.document.body.search("* and ?")).toHaveLength(1);
+      // A regex-as-pattern interpretation of ".*" would match every
+      // paragraph in the document; plain substring matching must not.
+      expect(context.document.body.search(".*")).toHaveLength(0);
+    });
+  });
 });
 
 describe("Body load/sync gating", () => {

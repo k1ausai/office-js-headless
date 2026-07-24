@@ -89,9 +89,8 @@ export class Body {
 
   // Synchronous, like Range.getRange() — a query, not a mutation.
   search(text: string, options?: SearchOptions): Range[] {
-    return this.doc
-      .search(text, options?.matchCase ?? false)
-      .map((p) => new Range(this.doc, p, this.platform, this.enqueue));
+    const matches = this.doc.search(text, options?.matchCase ?? false);
+    return Range.fromParagraphs(this.doc, matches, this.platform, this.enqueue);
   }
 
   load(propertyNames: BodyProperty | BodyProperty[]): void {

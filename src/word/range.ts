@@ -59,6 +59,17 @@ const OOXML_LOCATION_HANDLERS: Record<InsertLocationValue, LocationHandler> = {
 // design spec's v1 API coverage; Paragraph.getRange() (#14) and search()
 // (#13) are the actual entry points, still to come.
 export class Range {
+  // Shared by Body.search() and Range.search() — both wrap a set of matched
+  // paragraph elements as Range instances the same way.
+  static fromParagraphs(
+    doc: FlatOpcDocument,
+    paragraphs: Element[],
+    platform: SupportedPlatform,
+    enqueue: (op: QueuedOperation) => void
+  ): Range[] {
+    return paragraphs.map((p) => new Range(doc, p, platform, enqueue));
+  }
+
   constructor(
     private readonly doc: FlatOpcDocument,
     private readonly target: Element,
@@ -113,10 +124,10 @@ export class Range {
   // contains `text`) — a real sub-paragraph Range could return several
   // matches within one paragraph, which isn't representable here.
   search(text: string, options?: SearchOptions): Range[] {
-    return this.doc
+    const matches = this.doc
       .search(text, options?.matchCase ?? false)
-      .filter((p) => p === this.target)
-      .map((p) => new Range(this.doc, p, this.platform, this.enqueue));
+      .filter((p) => p === this.target);
+    return Range.fromParagraphs(this.doc, matches, this.platform, this.enqueue);
   }
 
   private insert(
