@@ -1,6 +1,5 @@
 // Matches the real Word.InsertLocation enum's string values
-// (node_modules/@types/office-js/index.d.ts) exactly — "End" only is
-// implemented so far; the rest arrive with the InsertLocation-splicing work.
+// (node_modules/@types/office-js/index.d.ts) exactly.
 export const InsertLocation = {
   before: "Before",
   after: "After",

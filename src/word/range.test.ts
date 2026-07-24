@@ -84,4 +84,23 @@ describe("Range InsertLocation dispatch", () => {
     const ooxml = doc.getOoxml();
     expect(ooxml.indexOf("Start-as-before.")).toBeLessThan(ooxml.indexOf("Seed paragraph."));
   });
+
+  it("insertParagraph(End) collapses to after — new sibling paragraph, target unchanged", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const target = firstParagraph(doc);
+    const range = new Range(doc, target, immediateEnqueue);
+
+    range.insertParagraph("End-as-after.", InsertLocation.end);
+    expect(doc.getParagraphText(target)).toBe("Seed paragraph.");
+    const ooxml = doc.getOoxml();
+    expect(ooxml.indexOf("Seed paragraph.")).toBeLessThan(ooxml.indexOf("End-as-after."));
+  });
+
+  it("insertParagraph(Replace) swaps the range's own content, same as insertText(Replace)", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const target = firstParagraph(doc);
+    const range = new Range(doc, target, immediateEnqueue);
+    range.insertParagraph("Replaced via insertParagraph.", InsertLocation.replace);
+    expect(doc.getParagraphText(target)).toBe("Replaced via insertParagraph.");
+  });
 });
