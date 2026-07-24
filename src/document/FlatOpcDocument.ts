@@ -467,6 +467,11 @@ export class FlatOpcDocument {
     return this.findCommentExtendedEntry(comment)?.getAttributeNS(W15_NS, "done") === "1";
   }
 
+  // Uses the comment's FIRST paragraph. Every fixture and real-world use
+  // case this shim has been tested against has single-paragraph comments,
+  // so this is unconfirmed for multi-paragraph ones — real Word may key
+  // w15:paraId off the LAST paragraph instead. Best-effort, not a verified
+  // assumption (same caution as paraId.ts's rsid omission).
   private getCommentOwnParaId(comment: Element): string | null {
     const p = findDirectChildElementNS(comment, W_NS, "p");
     return p && p.getAttributeNS(W14_NS, "paraId");
