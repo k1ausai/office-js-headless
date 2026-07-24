@@ -6,6 +6,7 @@ import { bodyInsertOoxmlReplace } from "../operations/bodyInsertOoxmlReplace";
 import { bodyInsertOoxmlStart } from "../operations/bodyInsertOoxmlStart";
 import { bodyInsertStart } from "../operations/bodyInsertStart";
 import { bodyReplace } from "../operations/bodyReplace";
+import { Comment } from "./comment";
 import { assertOoxmlSupported } from "./errors";
 import { InsertLocation, InsertLocationValue } from "./insertLocation";
 import { ParagraphCollection } from "./paragraphCollection";
@@ -102,6 +103,18 @@ export class Body {
 
   get tables(): TableCollection {
     return new TableCollection(this.doc, this.enqueue, this.registerSyncable);
+  }
+
+  // Synchronous, like .search()/.paragraphs — a query, not a mutation.
+  // Top-level comments only, each carrying its own threaded replies via
+  // .replies — matches real Word.CommentCollection, which doesn't flatten
+  // replies in as peers.
+  getComments(): Comment[] {
+    return this.doc.getTopLevelCommentElements().map((c) => {
+      const comment = new Comment(this.doc, c);
+      this.registerSyncable(comment);
+      return comment;
+    });
   }
 
   load(propertyNames: BodyProperty | BodyProperty[]): void {
