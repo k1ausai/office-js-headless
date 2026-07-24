@@ -67,15 +67,23 @@ export class FlatOpcDocument {
     return body;
   }
 
-  appendParagraph(text: string): Element {
-    const body = this.bodyElement;
-    const paragraph = this.xmlDoc.createElementNS(W_NS, "w:p");
+  private createRun(text: string): Element {
     const run = this.xmlDoc.createElementNS(W_NS, "w:r");
     const textNode = this.xmlDoc.createElementNS(W_NS, "w:t");
     textNode.appendChild(this.xmlDoc.createTextNode(text));
     run.appendChild(textNode);
-    paragraph.appendChild(run);
+    return run;
+  }
 
+  private createParagraph(text: string): Element {
+    const paragraph = this.xmlDoc.createElementNS(W_NS, "w:p");
+    paragraph.appendChild(this.createRun(text));
+    return paragraph;
+  }
+
+  appendParagraph(text: string): Element {
+    const body = this.bodyElement;
+    const paragraph = this.createParagraph(text);
     const sectPr = findDirectChildElementNS(body, W_NS, "sectPr");
     if (sectPr) {
       body.insertBefore(paragraph, sectPr);
@@ -83,6 +91,71 @@ export class FlatOpcDocument {
       body.appendChild(paragraph);
     }
     return paragraph;
+  }
+
+  insertParagraphBefore(target: Element, text: string): Element {
+    const paragraph = this.createParagraph(text);
+    if (!target.parentNode) {
+      throw new Error("FlatOpcDocument.insertParagraphBefore: target has no parent");
+    }
+    target.parentNode.insertBefore(paragraph, target);
+    return paragraph;
+  }
+
+  insertParagraphAfter(target: Element, text: string): Element {
+    const paragraph = this.createParagraph(text);
+    const parent = target.parentNode;
+    if (!parent) {
+      throw new Error("FlatOpcDocument.insertParagraphAfter: target has no parent");
+    }
+    if (target.nextSibling) {
+      parent.insertBefore(paragraph, target.nextSibling);
+    } else {
+      parent.appendChild(paragraph);
+    }
+    return paragraph;
+  }
+
+  replaceParagraphContent(target: Element, text: string): void {
+    while (target.firstChild) {
+      target.removeChild(target.firstChild);
+    }
+    target.appendChild(this.createRun(text));
+  }
+
+  insertParagraphAsFirstChild(text: string): Element {
+    const body = this.bodyElement;
+    const paragraph = this.createParagraph(text);
+    // insertBefore(node, null) appends — correctly handles an empty body too.
+    body.insertBefore(paragraph, body.firstChild);
+    return paragraph;
+  }
+
+  replaceBodyContent(text: string): Element {
+    const body = this.bodyElement;
+    while (body.firstChild) {
+      body.removeChild(body.firstChild);
+    }
+    const paragraph = this.createParagraph(text);
+    body.appendChild(paragraph);
+    return paragraph;
+  }
+
+  // A <w:pPr> (paragraph properties), if present, must stay the first child
+  // per the OOXML schema — new content is inserted after it, not literally
+  // as the first child.
+  prependTextInParagraph(target: Element, text: string): void {
+    const pPr = findDirectChildElementNS(target, W_NS, "pPr");
+    const insertBeforeNode = pPr ? pPr.nextSibling : target.firstChild;
+    target.insertBefore(this.createRun(text), insertBeforeNode);
+  }
+
+  appendTextInParagraph(target: Element, text: string): void {
+    target.appendChild(this.createRun(text));
+  }
+
+  getParagraphText(paragraph: Element): string {
+    return paragraphText(paragraph);
   }
 
   getOoxml(): string {
