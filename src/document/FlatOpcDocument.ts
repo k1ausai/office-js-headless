@@ -361,8 +361,7 @@ export class FlatOpcDocument {
   }
 
   // Public counterpart of getRealParagraphs() — for callers outside this
-  // class (ParagraphCollection) that need the actual elements, not just
-  // their joined text.
+  // class that need the actual elements, not just their joined text.
   getParagraphElements(): Element[] {
     return this.getRealParagraphs();
   }
