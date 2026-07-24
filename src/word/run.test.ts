@@ -50,8 +50,16 @@ describe("wordRun / RequestContext deferred batching", () => {
     await wordRun(doc, "PC", async (context) => {
       context.document.body.insertText("Inline read.", InsertLocation.end);
       await context.sync();
-      expect(context.document.body.getOoxml()).toContain("Inline read.");
-      expect(context.document.body.getOoxml()).toEqual(doc.getOoxml());
+      // Not a raw string comparison — the trailing paragraph mark's id
+      // churns on every single getOoxml() call (see ParaId stability model),
+      // so two separate calls are never byte-identical even with zero edits
+      // between them. Assert both reflect the same real content instead.
+      const viaBody = context.document.body.getOoxml();
+      const viaEscapeHatch = doc.getOoxml();
+      expect(viaBody).toContain("Inline read.");
+      expect(viaEscapeHatch).toContain("Inline read.");
+      expect(viaBody).toContain("Seed paragraph.");
+      expect(viaEscapeHatch).toContain("Seed paragraph.");
     });
   });
 

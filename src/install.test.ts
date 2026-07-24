@@ -163,4 +163,16 @@ describe("installHeadlessOffice", () => {
     expect(office.getOoxml()).not.toContain("Via insertOoxml.");
     office.dispose();
   });
+
+  it("the platform option reaches paraId churn behavior — OfficeOnline regenerates ids on every getOoxml() call", () => {
+    const office = installHeadlessOffice({
+      seedOoxml: MINIMAL_SEED_OOXML,
+      platform: "OfficeOnline",
+    });
+    const firstRead = office.getOoxml();
+    const secondRead = office.getOoxml();
+    const paraIdPattern = /w14:paraId="([0-9A-F]{8})"/;
+    expect(firstRead.match(paraIdPattern)?.[1]).not.toBe(secondRead.match(paraIdPattern)?.[1]);
+    office.dispose();
+  });
 });
