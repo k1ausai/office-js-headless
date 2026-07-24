@@ -100,6 +100,25 @@ describe("Body.search", () => {
   });
 });
 
+describe("Body.paragraphs", () => {
+  it("getFirst/getLast are reachable end-to-end through Word.run and reflect the current document", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, "PC", async (context) => {
+      context.document.body.insertParagraph("Second.", InsertLocation.end);
+      await context.sync();
+
+      const first = context.document.body.paragraphs.getFirst();
+      const last = context.document.body.paragraphs.getLast();
+      first.load("text");
+      last.load("text");
+      await context.sync();
+
+      expect(first.text).toBe("Seed paragraph.");
+      expect(last.text).toBe("Second.");
+    });
+  });
+});
+
 describe("Body load/sync gating", () => {
   it("reading .text without calling .load() first throws PropertyNotLoaded", async () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);

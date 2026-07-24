@@ -360,6 +360,12 @@ export class FlatOpcDocument {
     return this.getRealParagraphs().map(paragraphText).join("\n");
   }
 
+  // Public counterpart of getRealParagraphs() — for callers outside this
+  // class that need the actual elements, not just their joined text.
+  getParagraphElements(): Element[] {
+    return this.getRealParagraphs();
+  }
+
   // Design spec's "Core document model" lists `search(pattern)` as one of
   // FlatOpcDocument's primitives, alongside insertAt/deleteNode. Plain
   // substring matching only (issue #13: wildcard syntax and other

@@ -8,9 +8,10 @@ import { bodyInsertStart } from "../operations/bodyInsertStart";
 import { bodyReplace } from "../operations/bodyReplace";
 import { assertOoxmlSupported } from "./errors";
 import { InsertLocation, InsertLocationValue } from "./insertLocation";
+import { ParagraphCollection } from "./paragraphCollection";
 import { TrackedProperties } from "./proxy";
 import { Range } from "./range";
-import type { QueuedOperation } from "./run";
+import type { QueuedOperation, Syncable } from "./run";
 import { SearchOptions } from "./searchOptions";
 
 type BodyProperty = "text";
@@ -37,7 +38,8 @@ export class Body {
   constructor(
     private readonly doc: FlatOpcDocument,
     private readonly platform: SupportedPlatform,
-    private readonly enqueue: (op: QueuedOperation) => void
+    private readonly enqueue: (op: QueuedOperation) => void,
+    private readonly registerSyncable: (obj: Syncable) => void
   ) {}
 
   insertText(text: string, insertLocation: InsertLocationValue): void {
@@ -91,6 +93,10 @@ export class Body {
   search(text: string, options?: SearchOptions): Range[] {
     const matches = this.doc.search(text, options?.matchCase ?? false);
     return Range.fromParagraphs(this.doc, matches, this.platform, this.enqueue);
+  }
+
+  get paragraphs(): ParagraphCollection {
+    return new ParagraphCollection(this.doc, this.platform, this.enqueue, this.registerSyncable);
   }
 
   load(propertyNames: BodyProperty | BodyProperty[]): void {
