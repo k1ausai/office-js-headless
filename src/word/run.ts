@@ -1,4 +1,5 @@
 import { FlatOpcDocument } from "../document/FlatOpcDocument";
+import { SupportedPlatform } from "../office/context";
 import { Body } from "./body";
 
 export type QueuedOperation = () => void;
@@ -17,8 +18,8 @@ export class RequestContext {
   private readonly queue: QueuedOperation[] = [];
   private readonly syncables: Syncable[] = [];
 
-  constructor(doc: FlatOpcDocument) {
-    const body = new Body(doc, (op) => this.enqueue(op));
+  constructor(doc: FlatOpcDocument, platform: SupportedPlatform) {
+    const body = new Body(doc, platform, (op) => this.enqueue(op));
     this.document = { body };
     this.registerSyncable(body);
   }
@@ -50,8 +51,9 @@ export class RequestContext {
 
 export async function wordRun<T>(
   doc: FlatOpcDocument,
+  platform: SupportedPlatform,
   callback: (context: RequestContext) => Promise<T>
 ): Promise<T> {
-  const context = new RequestContext(doc);
+  const context = new RequestContext(doc, platform);
   return callback(context);
 }

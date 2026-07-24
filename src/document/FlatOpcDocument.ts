@@ -154,6 +154,96 @@ export class FlatOpcDocument {
     target.appendChild(this.createRun(text));
   }
 
+  // Real Office.js's insertOoxml exchanges the same Flat-OPC package shape
+  // as getOoxml — not a bare fragment — so the incoming string is parsed the
+  // same way a seed document is, then its paragraphs are imported into this
+  // document's own DOM (importNode, since nodes can't move between distinct
+  // xmldom Document instances directly).
+  private importOoxmlParagraphs(ooxml: string): Element[] {
+    const fragmentDoc = new FlatOpcDocument(ooxml);
+    const sourceParagraphs = findDirectChildElementsNS(fragmentDoc.bodyElement, W_NS, "p");
+    return sourceParagraphs.map((p) => this.xmlDoc.importNode(p, true));
+  }
+
+  insertOoxmlBefore(target: Element, ooxml: string): Element[] {
+    const nodes = this.importOoxmlParagraphs(ooxml);
+    if (!target.parentNode) {
+      throw new Error("FlatOpcDocument.insertOoxmlBefore: target has no parent");
+    }
+    for (const node of nodes) {
+      target.parentNode.insertBefore(node, target);
+    }
+    return nodes;
+  }
+
+  insertOoxmlAfter(target: Element, ooxml: string): Element[] {
+    const nodes = this.importOoxmlParagraphs(ooxml);
+    const parent = target.parentNode;
+    if (!parent) {
+      throw new Error("FlatOpcDocument.insertOoxmlAfter: target has no parent");
+    }
+    let anchor: Element = target;
+    for (const node of nodes) {
+      if (anchor.nextSibling) {
+        parent.insertBefore(node, anchor.nextSibling);
+      } else {
+        parent.appendChild(node);
+      }
+      anchor = node;
+    }
+    return nodes;
+  }
+
+  insertOoxmlAsFirstChild(ooxml: string): Element[] {
+    const body = this.bodyElement;
+    const nodes = this.importOoxmlParagraphs(ooxml);
+    const anchor = body.firstChild;
+    for (const node of nodes) {
+      // insertBefore(node, null) appends — correctly handles an empty body.
+      body.insertBefore(node, anchor);
+    }
+    return nodes;
+  }
+
+  insertOoxmlAsLastChild(ooxml: string): Element[] {
+    const body = this.bodyElement;
+    const nodes = this.importOoxmlParagraphs(ooxml);
+    const sectPr = findDirectChildElementNS(body, W_NS, "sectPr");
+    for (const node of nodes) {
+      if (sectPr) {
+        body.insertBefore(node, sectPr);
+      } else {
+        body.appendChild(node);
+      }
+    }
+    return nodes;
+  }
+
+  replaceOoxmlBodyContent(ooxml: string): Element[] {
+    const body = this.bodyElement;
+    const nodes = this.importOoxmlParagraphs(ooxml);
+    while (body.firstChild) {
+      body.removeChild(body.firstChild);
+    }
+    for (const node of nodes) {
+      body.appendChild(node);
+    }
+    return nodes;
+  }
+
+  replaceOoxmlAtTarget(target: Element, ooxml: string): Element[] {
+    const nodes = this.importOoxmlParagraphs(ooxml);
+    const parent = target.parentNode;
+    if (!parent) {
+      throw new Error("FlatOpcDocument.replaceOoxmlAtTarget: target has no parent");
+    }
+    for (const node of nodes) {
+      parent.insertBefore(node, target);
+    }
+    parent.removeChild(target);
+    return nodes;
+  }
+
   getParagraphText(paragraph: Element): string {
     return paragraphText(paragraph);
   }
