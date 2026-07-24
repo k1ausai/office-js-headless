@@ -56,6 +56,14 @@ export class RequestContext {
     // Drain the queue up front, not iterate-while-mutating — a queued op
     // failing partway through must not silently apply the ops after it, and
     // must not leave the failed op replayed on the next sync() call.
+    // `await` on a synchronous op is a no-op timing-wise for a single
+    // sync() call — it still resolves in the same microtask checkpoint,
+    // and a throw still rejects this sync() the same way. It does mean a
+    // sync() call is no longer a single atomic synchronous block end to
+    // end: two sync() calls racing via e.g. Promise.all could now
+    // interleave between ops in a way they couldn't before. Not a concern
+    // for this shim's sequential Word.run() usage, but worth knowing if
+    // that assumption ever changes.
     const pending = this.queue.splice(0, this.queue.length);
     for (const op of pending) {
       await op();
