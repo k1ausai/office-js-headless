@@ -314,7 +314,14 @@ The shim's entire value is "behaves like real Word," so that claim needs ongoing
   change; no separate approval step.
 - **Contract tests**: this package's CI suite replays each fixture's seed+operation through the
   shim and asserts the result matches the captured real-Word output, compared structurally
-  (paragraph text/paraId/style-name lists), not byte-for-byte.
+  (paragraph text/table cell text/style-name lists, paraId well-formedness), not byte-for-byte.
+  paraId is checked for format validity (8-hex-uppercase, present on every real paragraph), not
+  exact-value list equality against the fixture — this shim generates fresh random ids for every
+  newly-created paragraph, so a synthetic (hand-written, pre-#21) fixture has no "real" captured
+  id to diff a value against. Exact-value comparison for paragraphs a real capture confirms should
+  stay STABLE (not newly created by the operation under test) becomes meaningful once #21's
+  real-Word captures land, and can be added to the comparator then (see `test/structuralCompare.ts`
+  for the harness built in #20).
 - **Closing the loop on future gaps**: a divergence found downstream (in a consumer's pipeline)
   becomes a new golden fixture — capture real Word's actual output once, add it to the corpus, fix
   the shim to match. Production-found gaps become permanent regression tests.
