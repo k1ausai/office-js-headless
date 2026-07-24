@@ -10,22 +10,31 @@ import type { RequestContext } from "../src/word/run";
 // document (hand-written for these synthetic fixtures; a real capture from
 // #21 would have the exact same shape and drop into this same harness
 // unchanged).
-export interface Fixture {
+//
+// A discriminated union on expectRejection, rather than two independently-
+// optional fields, makes "resultOoxml is required unless this fixture
+// expects sync() to reject" a compile-time guarantee — a fixture author
+// can't accidentally omit both.
+interface FixtureBase {
   description: string;
   /** Defaults to "PC". */
   platform?: SupportedPlatform;
   seedOoxml: string;
   apply: (context: RequestContext) => void | Promise<void>;
-  /**
-   * The expected document state after apply()+sync(). Omit when
-   * expectRejection is set — a rejected sync() never produces a result to
-   * compare.
-   */
-  resultOoxml?: string;
-  /**
-   * Set when this fixture's apply() is expected to make sync() reject
-   * (e.g. insertOoxml on OfficeOnline). A RegExp narrows the expected
-   * rejection message; `true` accepts any rejection.
-   */
-  expectRejection?: boolean | RegExp;
 }
+
+export type Fixture =
+  | (FixtureBase & {
+      /** The expected document state after apply()+sync(). */
+      resultOoxml: string;
+      expectRejection?: undefined;
+    })
+  | (FixtureBase & {
+      resultOoxml?: undefined;
+      /**
+       * This fixture's apply() is expected to make sync() reject (e.g.
+       * insertOoxml on OfficeOnline). A RegExp narrows the expected
+       * rejection message; `true` accepts any rejection.
+       */
+      expectRejection: boolean | RegExp;
+    });

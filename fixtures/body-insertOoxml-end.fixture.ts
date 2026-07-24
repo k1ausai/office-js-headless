@@ -16,7 +16,7 @@ const fragment = `<?xml version="1.0" encoding="UTF-8"?>
   </pkg:part>
 </pkg:package>`;
 
-const fixture: Fixture = {
+export const fixture: Fixture = {
   description: "Body.insertOoxml(End) on PC applies the fragment as a new last paragraph",
   platform: "PC",
   seedOoxml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -48,5 +48,3 @@ const fixture: Fixture = {
   </pkg:part>
 </pkg:package>`,
 };
-
-export default fixture;

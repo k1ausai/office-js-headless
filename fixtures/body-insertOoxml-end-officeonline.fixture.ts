@@ -7,7 +7,7 @@ const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 // spec's "Platform selection" — insertOoxml applies on PC/Mac, rejects on
 // OfficeOnline (no client-side OOXML merge engine there, a real Word Online
 // product gap, not a missing capability).
-const fixture: Fixture = {
+export const fixture: Fixture = {
   description: "Body.insertOoxml(End) on OfficeOnline rejects at sync()",
   platform: "OfficeOnline",
   seedOoxml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -30,5 +30,3 @@ const fixture: Fixture = {
   },
   expectRejection: /insertOoxml/,
 };
-
-export default fixture;

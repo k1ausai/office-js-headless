@@ -2,7 +2,7 @@ import type { Fixture } from "../test/types";
 
 const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
-const fixture: Fixture = {
+export const fixture: Fixture = {
   description: "Table.addRows(End) appends a new row with columnCount cells, filled from values",
   seedOoxml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
@@ -55,5 +55,3 @@ const fixture: Fixture = {
   </pkg:part>
 </pkg:package>`,
 };
-
-export default fixture;

@@ -4,7 +4,7 @@ import type { Fixture } from "../test/types";
 
 const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
-const fixture: Fixture = {
+export const fixture: Fixture = {
   description:
     "Body.insertFileFromBase64 merges the imported .docx's styles.xml into the current document",
   seedOoxml: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -52,5 +52,3 @@ const fixture: Fixture = {
   </pkg:part>
 </pkg:package>`,
 };
-
-export default fixture;

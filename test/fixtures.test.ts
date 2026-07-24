@@ -9,7 +9,7 @@ import type { Fixture } from "./types";
 // asserts the result matches... compared structurally... not byte-for-byte."
 // Discovers every fixtures/*.fixture.ts file automatically — adding a new
 // fixture doesn't require touching this runner.
-const fixtureModules = import.meta.glob<{ default: Fixture }>("../fixtures/*.fixture.ts", {
+const fixtureModules = import.meta.glob<{ fixture: Fixture }>("../fixtures/*.fixture.ts", {
   eager: true,
 });
 const fixtureEntries = Object.entries(fixtureModules);
@@ -20,15 +20,15 @@ describe("fixture replay", () => {
   });
 
   for (const [path, mod] of fixtureEntries) {
-    const fixture = mod.default;
+    const fixture = mod.fixture;
     const name = path.split("/").pop();
 
     it(`${name}: ${fixture.description}`, async () => {
       const platform = fixture.platform ?? "PC";
       const doc = new FlatOpcDocument(fixture.seedOoxml, platform);
 
-      const expectRejection = fixture.expectRejection;
-      if (expectRejection) {
+      if (fixture.resultOoxml === undefined) {
+        const { expectRejection } = fixture;
         await wordRun(doc, platform, async (context) => {
           await fixture.apply(context);
           const expectedMessage = expectRejection instanceof RegExp ? expectRejection : undefined;
@@ -37,14 +37,19 @@ describe("fixture replay", () => {
         return;
       }
 
-      if (!fixture.resultOoxml) {
-        throw new Error(`${name}: resultOoxml is required unless expectRejection is set`);
-      }
+      // Narrowed to the resultOoxml-required union member here, synchronously
+      // right after the discriminant check — TS's narrowing of `fixture`
+      // itself doesn't reliably persist across the `await` below.
+      const { resultOoxml } = fixture;
       await wordRun(doc, platform, async (context) => {
         await fixture.apply(context);
         await context.sync();
       });
-      expectStructuralMatch(doc.getOoxml(), fixture.resultOoxml);
+      // Passes the live doc, not doc.getOoxml() — structuralSummaryOfDocument()
+      // (used internally for a FlatOpcDocument actual side) reads directly
+      // off the doc's own tracked paragraphs, no string round-trip needed
+      // and no trailing-mark ambiguity to resolve for this side.
+      expectStructuralMatch(doc, resultOoxml);
     });
   }
 });
