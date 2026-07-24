@@ -1,6 +1,6 @@
 {
   "name": "office-js-headless",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Headless Office.js runtime for testing Word add-ins without real Word",
   "license": "MIT",
   "type": "module",
