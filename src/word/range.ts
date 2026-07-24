@@ -1,6 +1,6 @@
 import { type Element } from "@xmldom/xmldom";
 import { FlatOpcDocument } from "../document/FlatOpcDocument";
-import { SupportedPlatform, isSetSupported } from "../office/context";
+import { SupportedPlatform } from "../office/context";
 import { rangeInsertAfter } from "../operations/rangeInsertAfter";
 import { rangeInsertBefore } from "../operations/rangeInsertBefore";
 import { rangeInsertEnd } from "../operations/rangeInsertEnd";
@@ -13,7 +13,7 @@ import { rangeInsertStart } from "../operations/rangeInsertStart";
 import { rangeParagraphInsertEnd } from "../operations/rangeParagraphInsertEnd";
 import { rangeParagraphInsertStart } from "../operations/rangeParagraphInsertStart";
 import { rangeReplace } from "../operations/rangeReplace";
-import { richApiError } from "./errors";
+import { assertOoxmlSupported } from "./errors";
 import { InsertLocation, InsertLocationValue } from "./insertLocation";
 import type { QueuedOperation } from "./run";
 
@@ -70,12 +70,7 @@ export class Range {
 
   insertOoxml(ooxml: string, insertLocation: InsertLocationValue): void {
     this.enqueue(() => {
-      if (!isSetSupported(this.platform, "WordApiDesktop")) {
-        throw richApiError(
-          "GeneralException",
-          "insertOoxml is not supported on this platform (Word Online has no client-side OOXML merge implementation)."
-        );
-      }
+      assertOoxmlSupported(this.platform);
       OOXML_LOCATION_HANDLERS[insertLocation](this.doc, this.target, ooxml);
     });
   }

@@ -1,12 +1,12 @@
 import { FlatOpcDocument } from "../document/FlatOpcDocument";
-import { SupportedPlatform, isSetSupported } from "../office/context";
+import { SupportedPlatform } from "../office/context";
 import { bodyInsertEnd } from "../operations/bodyInsertEnd";
 import { bodyInsertOoxmlEnd } from "../operations/bodyInsertOoxmlEnd";
 import { bodyInsertOoxmlReplace } from "../operations/bodyInsertOoxmlReplace";
 import { bodyInsertOoxmlStart } from "../operations/bodyInsertOoxmlStart";
 import { bodyInsertStart } from "../operations/bodyInsertStart";
 import { bodyReplace } from "../operations/bodyReplace";
-import { richApiError } from "./errors";
+import { assertOoxmlSupported } from "./errors";
 import { InsertLocation, InsertLocationValue } from "./insertLocation";
 import { TrackedProperties } from "./proxy";
 import type { QueuedOperation } from "./run";
@@ -47,17 +47,10 @@ export class Body {
   }
 
   insertOoxml(ooxml: string, insertLocation: InsertLocationValue): void {
-    // Real Word Online has no browser-side OOXML merge engine — a genuine,
-    // unfixed Microsoft product bug, not a missing capability (see design
-    // spec's "Platform selection" section). Checked at sync() time, not the
-    // call site, matching every other deferred validation in this shim.
+    // Checked at sync() time, not the call site, matching every other
+    // deferred validation in this shim.
     this.enqueue(() => {
-      if (!isSetSupported(this.platform, "WordApiDesktop")) {
-        throw richApiError(
-          "GeneralException",
-          "insertOoxml is not supported on this platform (Word Online has no client-side OOXML merge implementation)."
-        );
-      }
+      assertOoxmlSupported(this.platform);
       const handler = OOXML_LOCATION_HANDLERS[insertLocation];
       if (!handler) {
         throw new Error(

@@ -2,9 +2,7 @@ import { richApiError } from "./errors";
 
 // Real Office.js does not distinguish "property never named in .load()" from
 // "loaded but not yet followed by context.sync()" — both throw the identical
-// error, traced from the shipped runtime (@microsoft/office-js), not just its
-// published types (which document a different, unobserved error name — see
-// doc/wayfinder/tickets/001-error-message-shape.md and 007-error-name-value.md).
+// error (see word/errors.ts for the shared RichApi.Error shape and why).
 export function propertyNotLoadedError(propertyName: string): Error {
   return richApiError(
     "PropertyNotLoaded",

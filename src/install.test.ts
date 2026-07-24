@@ -110,8 +110,7 @@ describe("installHeadlessOffice", () => {
     office.dispose();
   });
 
-  it("insertOoxml applies the fragment on PC/Mac", async () => {
-    const office = installHeadlessOffice({ seedOoxml: MINIMAL_SEED_OOXML, platform: "PC" });
+  it("insertOoxml applies the fragment on PC and Mac", async () => {
     const fragment = `<?xml version="1.0" encoding="UTF-8"?>
 <pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
   <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
@@ -125,13 +124,17 @@ describe("installHeadlessOffice", () => {
   </pkg:part>
 </pkg:package>`;
 
-    await getInstalledWord().run(async (context) => {
-      context.document.body.insertOoxml(fragment, getInstalledWord().InsertLocation.end);
-      await context.sync();
-    });
+    for (const platform of ["PC", "Mac"] as const) {
+      const office = installHeadlessOffice({ seedOoxml: MINIMAL_SEED_OOXML, platform });
 
-    expect(office.getOoxml()).toContain("Via insertOoxml.");
-    office.dispose();
+      await getInstalledWord().run(async (context) => {
+        context.document.body.insertOoxml(fragment, getInstalledWord().InsertLocation.end);
+        await context.sync();
+      });
+
+      expect(office.getOoxml()).toContain("Via insertOoxml.");
+      office.dispose();
+    }
   });
 
   it("insertOoxml rejects at sync() on OfficeOnline (no client-side merge engine there)", async () => {

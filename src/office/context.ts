@@ -26,8 +26,15 @@ const PLATFORM_TYPE_BY_NAME: Record<SupportedPlatform, number> = {
 // — WordApiDesktop, true on PC/Mac, false on OfficeOnline (a genuine
 // capability gap, not a shim limitation). Anything else queried (e.g. plain
 // WordApi, supported everywhere in scope) defaults to true rather than
-// modeling every real api-set/version pair.
-export function isSetSupported(platform: SupportedPlatform, name: string): boolean {
+// modeling every real api-set/version pair. `minVersion` is accepted (real
+// Office.js's signature takes it) but not consulted — nothing in scope
+// queries a version boundary, only WordApiDesktop's binary PC/Mac-vs-web gap.
+export function isSetSupported(
+  platform: SupportedPlatform,
+  name: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  minVersion?: string
+): boolean {
   if (name === "WordApiDesktop") {
     return platform !== "OfficeOnline";
   }
@@ -69,7 +76,8 @@ export function createOfficeGlobal(platform: SupportedPlatform): OfficeGlobal {
         readyContext = {
           platform: platformType,
           requirements: {
-            isSetSupported: (name: string) => isSetSupported(platform, name),
+            isSetSupported: (name: string, minVersion?: string) =>
+              isSetSupported(platform, name, minVersion),
           },
         };
         const info = { host: HostType.Word, platform: platformType };

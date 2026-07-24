@@ -16,13 +16,17 @@ Key decisions already made there — don't relitigate without a strong reason:
 - `.load()`/`.sync()` gating is strict: reading an unloaded or unsynced property throws, same as
   real Office.js. This is intentional — it's what catches real add-in bugs.
 - Structural/semantic OOXML fidelity is the goal, not byte-exact serialization.
-- Desktop Word fidelity is the target. Word Online's degraded/fallback behavior is explicitly out
-  of scope.
+- The shim targets whichever platform (`PC`/`Mac`/`OfficeOnline`) `installHeadlessOffice`'s
+  `platform` option is told to emulate — not desktop-only. Platform-specific behavior (capability
+  signals, `insertOoxml`/`insertFileFromBase64` failing on `OfficeOnline`, paraId churn) is
+  in-scope and must match the real host per platform; only the _why_ behind Word Online's
+  internals is out of scope, not its observable behavior.
 
 ## Fidelity validation
 
 Every supported operation should have a golden fixture in `fixtures/` — a real
-`{seedOoxml, operation+args, resultOoxml}` triple captured from actual Word desktop. The shim's
+`{seedOoxml, operation+args, resultOoxml}` triple captured from actual Word, per platform where
+behavior diverges (`PC`/`Mac` can usually share one; `OfficeOnline` separately). The shim's
 own tests replay these and assert structural equivalence (not byte-diff). If a real-world case is
 found where the shim diverges from real Word, capture it as a new golden fixture before fixing the
 shim — production-found gaps become permanent regression tests.

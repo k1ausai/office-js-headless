@@ -104,10 +104,7 @@ describe("Range InsertLocation dispatch", () => {
     expect(doc.getParagraphText(target)).toBe("Replaced via insertParagraph.");
   });
 
-  it("insertOoxml applies the fragment on PC, splicing it after the target", () => {
-    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
-    const target = firstParagraph(doc);
-    const range = new Range(doc, target, "PC", immediateEnqueue);
+  it("insertOoxml applies the fragment on PC and Mac, splicing it after the target", () => {
     const fragment = `<?xml version="1.0" encoding="UTF-8"?>
 <pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
   <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
@@ -120,9 +117,15 @@ describe("Range InsertLocation dispatch", () => {
     </pkg:xmlData>
   </pkg:part>
 </pkg:package>`;
-    range.insertOoxml(fragment, InsertLocation.after);
-    const ooxml = doc.getOoxml();
-    expect(ooxml.indexOf("Seed paragraph.")).toBeLessThan(ooxml.indexOf("Fragment content."));
+
+    for (const platform of ["PC", "Mac"] as const) {
+      const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+      const target = firstParagraph(doc);
+      const range = new Range(doc, target, platform, immediateEnqueue);
+      range.insertOoxml(fragment, InsertLocation.after);
+      const ooxml = doc.getOoxml();
+      expect(ooxml.indexOf("Seed paragraph.")).toBeLessThan(ooxml.indexOf("Fragment content."));
+    }
   });
 
   it("insertOoxml throws on OfficeOnline (no client-side merge engine there)", () => {
