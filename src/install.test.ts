@@ -18,6 +18,7 @@ interface MinimalWordContext {
 interface MinimalWordGlobal {
   run<T>(callback: (context: MinimalWordContext) => Promise<T>): Promise<T>;
   InsertLocation: { end: string; start: string };
+  BuiltInStyleName: { heading1: string; normal: string };
 }
 interface MinimalOfficeGlobal {
   context: { platform: number; requirements: { isSetSupported(name: string): boolean } };
@@ -44,6 +45,13 @@ describe("installHeadlessOffice", () => {
     const office = installHeadlessOffice({ seedOoxml: MINIMAL_SEED_OOXML });
     expect(typeof getInstalledWord().run).toBe("function");
     expect(getInstalledWord().InsertLocation.end).toBe("End");
+    office.dispose();
+  });
+
+  it("exposes Word.BuiltInStyleName, matching real Word's built-in style ids", () => {
+    const office = installHeadlessOffice({ seedOoxml: MINIMAL_SEED_OOXML });
+    expect(getInstalledWord().BuiltInStyleName.heading1).toBe("Heading1");
+    expect(getInstalledWord().BuiltInStyleName.normal).toBe("Normal");
     office.dispose();
   });
 

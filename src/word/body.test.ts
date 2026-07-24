@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { COMMENT_SEED_OOXML } from "../document/__fixtures__/commentSeed";
 import { FlatOpcDocument } from "../document/FlatOpcDocument";
 import { MINIMAL_SEED_OOXML } from "../document/__fixtures__/minimalSeed";
+import { STYLE_SEED_OOXML } from "../document/__fixtures__/styleSeed";
 import { TABLE_SEED_OOXML } from "../document/__fixtures__/tableSeed";
+import { BuiltInStyleName } from "./builtInStyleName";
 import { InsertLocation } from "./insertLocation";
 import { wordRun } from "./run";
 
@@ -172,6 +174,34 @@ describe("Body.getComments", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
     await wordRun(doc, "PC", async (context) => {
       expect(context.document.body.getComments()).toEqual([]);
+    });
+  });
+});
+
+describe("Body.getStyles", () => {
+  it("returns every distinct style, reachable end-to-end through Word.run, with BuiltInStyleName resolving against real ids", async () => {
+    const doc = new FlatOpcDocument(STYLE_SEED_OOXML);
+    await wordRun(doc, "PC", async (context) => {
+      const styles = context.document.body.getStyles();
+      expect(styles).toHaveLength(4);
+
+      styles.forEach((s) => s.load(["id", "nameLocal", "type", "builtIn"]));
+      await context.sync();
+
+      const heading1 = styles.find((s) => s.id === BuiltInStyleName.heading1);
+      expect(heading1?.nameLocal).toBe("heading 1");
+      expect(heading1?.builtIn).toBe(true);
+
+      const custom = styles.find((s) => s.id === "MyCustomStyle");
+      expect(custom?.builtIn).toBe(false);
+      expect(custom?.type).toBe("Paragraph");
+    });
+  });
+
+  it("returns an empty array for a document with no styles.xml part", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, "PC", async (context) => {
+      expect(context.document.body.getStyles()).toEqual([]);
     });
   });
 });
