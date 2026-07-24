@@ -1,5 +1,6 @@
 import { FlatOpcDocument } from "./document/FlatOpcDocument";
 import { createOfficeGlobal, SupportedPlatform } from "./office/context";
+import { BuiltInStyleName } from "./word/builtInStyleName";
 import { InsertLocation } from "./word/insertLocation";
 import { RequestContext, wordRun } from "./word/run";
 
@@ -26,6 +27,7 @@ export function installHeadlessOffice(options: InstallHeadlessOfficeOptions): He
   const wordGlobal = {
     run: <T>(callback: (context: RequestContext) => Promise<T>) => wordRun(doc, platform, callback),
     InsertLocation,
+    BuiltInStyleName,
   };
 
   // Real add-in code references bare global `Word`/`Office` — this is the

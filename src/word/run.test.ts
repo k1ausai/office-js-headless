@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { FlatOpcDocument } from "../document/FlatOpcDocument";
 import { MINIMAL_SEED_OOXML } from "../document/__fixtures__/minimalSeed";
+import { STYLE_SEED_OOXML } from "../document/__fixtures__/styleSeed";
+import { BuiltInStyleName } from "./builtInStyleName";
 import { InsertLocation } from "./insertLocation";
 import { wordRun } from "./run";
 
@@ -76,5 +78,33 @@ describe("wordRun / RequestContext deferred batching", () => {
     const firstIndex = ooxml.indexOf("Once.");
     const lastIndex = ooxml.lastIndexOf("Once.");
     expect(firstIndex).toEqual(lastIndex);
+  });
+});
+
+describe("RequestContext.document.getStyles", () => {
+  it("returns every distinct style, with BuiltInStyleName resolving against real ids — real Word.Document.getStyles(), not Body.getStyles()", async () => {
+    const doc = new FlatOpcDocument(STYLE_SEED_OOXML);
+    await wordRun(doc, "PC", async (context) => {
+      const styles = context.document.getStyles();
+      expect(styles).toHaveLength(4);
+
+      styles.forEach((s) => s.load(["id", "nameLocal", "type", "builtIn"]));
+      await context.sync();
+
+      const heading1 = styles.find((s) => s.id === BuiltInStyleName.heading1);
+      expect(heading1?.nameLocal).toBe("heading 1");
+      expect(heading1?.builtIn).toBe(true);
+
+      const custom = styles.find((s) => s.id === "MyCustomStyle");
+      expect(custom?.builtIn).toBe(false);
+      expect(custom?.type).toBe("Paragraph");
+    });
+  });
+
+  it("returns an empty array for a document with no styles.xml part", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, "PC", async (context) => {
+      expect(context.document.getStyles()).toEqual([]);
+    });
   });
 });

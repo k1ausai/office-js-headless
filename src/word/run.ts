@@ -1,6 +1,7 @@
 import { FlatOpcDocument } from "../document/FlatOpcDocument";
 import { SupportedPlatform } from "../office/context";
 import { Body } from "./body";
+import { Style } from "./style";
 
 export type QueuedOperation = () => void;
 
@@ -14,7 +15,7 @@ export interface Syncable {
 }
 
 export class RequestContext {
-  readonly document: { body: Body };
+  readonly document: { body: Body; getStyles(): Style[] };
   private readonly queue: QueuedOperation[] = [];
   private readonly syncables: Syncable[] = [];
 
@@ -25,7 +26,18 @@ export class RequestContext {
       (op) => this.enqueue(op),
       (obj) => this.registerSyncable(obj)
     );
-    this.document = { body };
+    this.document = {
+      body,
+      // Real Word.Document.getStyles() — not Body.getStyles(), which
+      // doesn't exist on the real Word.Body class. Synchronous, like
+      // Body.getComments()/.search() — a query, not a mutation.
+      getStyles: () =>
+        doc.getStyleElements().map((s) => {
+          const style = new Style(doc, s);
+          this.registerSyncable(style);
+          return style;
+        }),
+    };
     this.registerSyncable(body);
   }
 

@@ -12,6 +12,10 @@ const W15_NS = "http://schemas.microsoft.com/office/word/2012/wordml";
 const PKG_NS = "http://schemas.microsoft.com/office/2006/xmlPackage";
 const ELEMENT_NODE = 1;
 
+// Matches real Word.StyleType's string values. Shared with word/style.ts's
+// Style.type, rather than each side declaring its own copy of this union.
+export type StyleType = "Paragraph" | "Character" | "Table" | "List";
+
 // Subtree search — fine for locating the single <w:body> nested under
 // <pkg:package>/<pkg:part>/<pkg:xmlData>/<w:document>, since a document.xml
 // part has exactly one <w:body>.
@@ -486,6 +490,47 @@ export class FlatOpcDocument {
         (entry) => entry.getAttributeNS(W15_NS, "paraId") === ownParaId
       ) ?? null
     );
+  }
+
+  private get stylesRoot(): Element | null {
+    return findPartRoot(this.xmlDoc, "/word/styles.xml");
+  }
+
+  getStyleElements(): Element[] {
+    const root = this.stylesRoot;
+    return root ? findDirectChildElementsNS(root, W_NS, "style") : [];
+  }
+
+  getStyleId(style: Element): string {
+    return style.getAttributeNS(W_NS, "styleId") ?? "";
+  }
+
+  getStyleNameLocal(style: Element): string {
+    const name = findDirectChildElementNS(style, W_NS, "name");
+    return name?.getAttributeNS(W_NS, "val") ?? "";
+  }
+
+  getStyleType(style: Element): StyleType {
+    const type = style.getAttributeNS(W_NS, "type");
+    switch (type) {
+      case "character":
+        return "Character";
+      case "table":
+        return "Table";
+      case "numbering":
+        return "List";
+      default:
+        return "Paragraph";
+    }
+  }
+
+  // Real OOXML has no explicit "this is built-in" flag — w:customStyle="1"
+  // is how a CUSTOM style is marked; its absence means built-in, which is
+  // also why real Word's built-in w:styleId values are exactly the
+  // Word.BuiltInStyleName enum's strings (Heading1, Title, ...) — they're
+  // the fixed, well-known ids Word itself always uses for its own styles.
+  getStyleBuiltIn(style: Element): boolean {
+    return style.getAttributeNS(W_NS, "customStyle") !== "1";
   }
 
   // Design spec's "Core document model" lists `search(pattern)` as one of
