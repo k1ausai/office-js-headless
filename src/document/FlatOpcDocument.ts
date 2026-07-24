@@ -384,6 +384,109 @@ export class FlatOpcDocument {
     });
   }
 
+  // True column count lives in w:tblGrid independent of per-row w:tc counts
+  // under gridSpan/merges — never derive it from max(tr children) (issue
+  // #15's AC).
+  getTableColumnCount(table: Element): number {
+    const tblGrid = findDirectChildElementNS(table, W_NS, "tblGrid");
+    return tblGrid ? findDirectChildElementsNS(tblGrid, W_NS, "gridCol").length : 0;
+  }
+
+  getTableRows(table: Element): Element[] {
+    return findDirectChildElementsNS(table, W_NS, "tr");
+  }
+
+  getRowCells(row: Element): Element[] {
+    return findDirectChildElementsNS(row, W_NS, "tc");
+  }
+
+  // Cell content nests identically to body paragraphs (w:tc > w:p > w:r >
+  // w:t) — reuses the same paragraph text read used everywhere else, per
+  // design spec's "Table OOXML shape".
+  getCellText(cell: Element): string {
+    return paragraphText(this.requireCellParagraph(cell));
+  }
+
+  setCellText(cell: Element, text: string): void {
+    this.replaceParagraphContent(this.requireCellParagraph(cell), text);
+  }
+
+  private requireCellParagraph(cell: Element): Element {
+    const paragraph = findDirectChildElementNS(cell, W_NS, "p");
+    if (!paragraph) {
+      throw new Error("FlatOpcDocument: table cell has no <w:p> content");
+    }
+    return paragraph;
+  }
+
+  // w:gridSpan absent means "spans exactly 1 grid column" (ECMA-376
+  // §17.4.17) — not a merge.
+  getCellGridSpan(cell: Element): number {
+    const tcPr = findDirectChildElementNS(cell, W_NS, "tcPr");
+    const gridSpan = tcPr && findDirectChildElementNS(tcPr, W_NS, "gridSpan");
+    const val = gridSpan?.getAttributeNS(W_NS, "val");
+    return val ? Number.parseInt(val, 10) : 1;
+  }
+
+  // w:vMerge present with no @w:val is the schema default "continue"
+  // (ECMA-376 §17.4.86) — distinct from the element being entirely absent
+  // (no merge at all).
+  getCellVMerge(cell: Element): "Continue" | "Restart" | undefined {
+    const tcPr = findDirectChildElementNS(cell, W_NS, "tcPr");
+    const vMerge = tcPr && findDirectChildElementNS(tcPr, W_NS, "vMerge");
+    if (!vMerge) return undefined;
+    const val = vMerge.getAttributeNS(W_NS, "val");
+    return val === "restart" ? "Restart" : "Continue";
+  }
+
+  // Reasonable schema-valid defaults for w:tcW (auto width) absent a
+  // captured real-Word fixture to confirm Word's own authoring values —
+  // same "unresolved without a captured fixture" caveat as tblStyle/tblLook
+  // boilerplate (design spec's "Table OOXML shape").
+  private createTableCell(text: string): Element {
+    const cell = this.xmlDoc.createElementNS(W_NS, "w:tc");
+    const tcPr = this.xmlDoc.createElementNS(W_NS, "w:tcPr");
+    const tcW = this.xmlDoc.createElementNS(W_NS, "w:tcW");
+    tcW.setAttributeNS(W_NS, "w:w", "0");
+    tcW.setAttributeNS(W_NS, "w:type", "auto");
+    tcPr.appendChild(tcW);
+    cell.appendChild(tcPr);
+    cell.appendChild(this.createParagraph(text));
+    return cell;
+  }
+
+  // w:tblPr/w:trPr are omitted entirely for v1 (design spec's "Table OOXML
+  // shape") — nothing in the covered API surface needs table-wide or
+  // row-wide formatting, so table/row construction never emits them.
+  addTableRows(
+    table: Element,
+    insertLocation: "Start" | "End",
+    rowCount: number,
+    values?: string[][]
+  ): Element[] {
+    const columnCount = this.getTableColumnCount(table);
+    const newRows: Element[] = [];
+    for (let i = 0; i < rowCount; i++) {
+      const row = this.xmlDoc.createElementNS(W_NS, "w:tr");
+      for (let col = 0; col < columnCount; col++) {
+        row.appendChild(this.createTableCell(values?.[i]?.[col] ?? ""));
+      }
+      newRows.push(row);
+    }
+
+    if (insertLocation === "Start") {
+      const anchor = this.getTableRows(table)[0] ?? null;
+      for (const row of newRows) {
+        table.insertBefore(row, anchor);
+      }
+    } else {
+      for (const row of newRows) {
+        table.appendChild(row);
+      }
+    }
+    return newRows;
+  }
+
   reset(): void {
     this.xmlDoc = new DOMParser().parseFromString(this.seedOoxml, "text/xml");
     this.ensureTrailingMark();
