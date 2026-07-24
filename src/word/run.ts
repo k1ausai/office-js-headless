@@ -3,7 +3,10 @@ import { SupportedPlatform } from "../office/context";
 import { Body } from "./body";
 import { Style } from "./style";
 
-export type QueuedOperation = () => void;
+// Async is needed for insertFileFromBase64 (#19), which unzips a .docx via
+// jszip — a genuinely asynchronous operation, unlike every other queued
+// mutation. All existing synchronous `() => void` closures remain valid.
+export type QueuedOperation = () => void | Promise<void>;
 
 // Every shim proxy object that tracks loaded properties (Body, and later
 // Range/Paragraph/Table) implements this so RequestContext can snapshot all
@@ -53,9 +56,17 @@ export class RequestContext {
     // Drain the queue up front, not iterate-while-mutating — a queued op
     // failing partway through must not silently apply the ops after it, and
     // must not leave the failed op replayed on the next sync() call.
+    // `await` on a synchronous op is a no-op timing-wise for a single
+    // sync() call — it still resolves in the same microtask checkpoint,
+    // and a throw still rejects this sync() the same way. It does mean a
+    // sync() call is no longer a single atomic synchronous block end to
+    // end: two sync() calls racing via e.g. Promise.all could now
+    // interleave between ops in a way they couldn't before. Not a concern
+    // for this shim's sequential Word.run() usage, but worth knowing if
+    // that assumption ever changes.
     const pending = this.queue.splice(0, this.queue.length);
     for (const op of pending) {
-      op();
+      await op();
     }
     // Loaded properties snapshot AFTER mutations apply — real add-in code
     // relies on load()+sync() in the same batch as a mutation seeing the

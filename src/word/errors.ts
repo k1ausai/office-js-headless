@@ -23,3 +23,16 @@ export function assertOoxmlSupported(platform: SupportedPlatform): void {
     );
   }
 }
+
+// Body.insertFileFromBase64 — a distinct real gap from insertOoxml's (design
+// spec's "Platform selection" table): Word Online has no client-side
+// implementation of this call AT ALL, not a merge-engine bug in an
+// otherwise-supported call.
+export function assertFileImportSupported(platform: SupportedPlatform): void {
+  if (!isSetSupported(platform, "WordApiDesktop")) {
+    throw richApiError(
+      "GeneralException",
+      "insertFileFromBase64 is not supported on this platform (Word Online has no client-side implementation of this call)."
+    );
+  }
+}

@@ -1,6 +1,7 @@
 import { FlatOpcDocument } from "../document/FlatOpcDocument";
 import { SupportedPlatform } from "../office/context";
 import { bodyInsertEnd } from "../operations/bodyInsertEnd";
+import { bodyInsertFileFromBase64 } from "../operations/bodyInsertFileFromBase64";
 import { bodyInsertHtmlEnd } from "../operations/bodyInsertHtmlEnd";
 import { bodyInsertHtmlReplace } from "../operations/bodyInsertHtmlReplace";
 import { bodyInsertHtmlStart } from "../operations/bodyInsertHtmlStart";
@@ -10,7 +11,7 @@ import { bodyInsertOoxmlStart } from "../operations/bodyInsertOoxmlStart";
 import { bodyInsertStart } from "../operations/bodyInsertStart";
 import { bodyReplace } from "../operations/bodyReplace";
 import { Comment } from "./comment";
-import { assertOoxmlSupported } from "./errors";
+import { assertFileImportSupported, assertOoxmlSupported } from "./errors";
 import { InsertLocation, InsertLocationValue } from "./insertLocation";
 import { ParagraphCollection } from "./paragraphCollection";
 import { TrackedProperties } from "./proxy";
@@ -82,6 +83,29 @@ export class Body {
   // around insertOoxml's OfficeOnline gap).
   insertHtml(html: string, insertLocation: InsertLocationValue): void {
     this.dispatch(HTML_LOCATION_HANDLERS, html, insertLocation, "Body.insertHtml");
+  }
+
+  // Deliberate fidelity gap (design spec) — merges the imported .docx's
+  // styles.xml/numbering.xml only, never the file's body content (unlike
+  // real Word's full implementation). insertLocation is accepted, and still
+  // validated against Body's usual Start/End/Replace restriction (a
+  // consumer passing Before/After is a real bug this shim should still
+  // catch), but otherwise unused — nothing here inserts body content for a
+  // location to apply to.
+  insertFileFromBase64(base64File: string, insertLocation: InsertLocationValue): void {
+    this.enqueue(async () => {
+      assertFileImportSupported(this.platform);
+      if (
+        insertLocation !== InsertLocation.replace &&
+        insertLocation !== InsertLocation.start &&
+        insertLocation !== InsertLocation.end
+      ) {
+        throw new Error(
+          `Body.insertFileFromBase64: InsertLocation "${insertLocation}" is not applicable to Body (only "Start"/"End"/"Replace" apply)`
+        );
+      }
+      await bodyInsertFileFromBase64(this.doc, base64File);
+    });
   }
 
   private dispatch(

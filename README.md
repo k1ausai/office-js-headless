@@ -35,6 +35,18 @@ office.getOoxml();
 office.dispose();
 ```
 
+## Known limitations
+
+- **`insertFileFromBase64` is a deliberate fidelity gap.** Real Word merges an imported `.docx`'s
+  `styles.xml`/`numbering.xml` into the current document using an internal, undocumented
+  algorithm. This package unzips the file (via `jszip`) and copies those parts' entries in
+  directly, without real conflict resolution (id collisions aren't detected or renamed) — enough
+  to exercise the template-import code path, not a full-fidelity merge. The imported file's body
+  content is not inserted. Rejects on `OfficeOnline`, matching real Word Online (no client-side
+  implementation of this call there at all). See
+  [`doc/design-spec`](./doc/design-spec)'s "`insertFileFromBase64` — deliberate fidelity gap"
+  section.
+
 ## Scope
 
 Word only, for now. See [`doc/design-spec`](./doc/design-spec) for the full design, coverage list,

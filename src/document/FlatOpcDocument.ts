@@ -678,6 +678,58 @@ export class FlatOpcDocument {
     return style.getAttributeNS(W_NS, "customStyle") !== "1";
   }
 
+  // Design spec's "insertFileFromBase64 — deliberate fidelity gap": "copy
+  // styles.xml/numbering.xml entries in without real conflict resolution."
+  // A naive append — imported entries land alongside whatever's already
+  // there, including any w:styleId collisions; real Word's actual merge
+  // algorithm is internal/undocumented and disproportionate effort to
+  // replicate for one call site (issue #19).
+  mergeStylesXml(stylesXml: string): void {
+    this.mergePart("/word/styles.xml", "styles", "styles+xml", stylesXml);
+  }
+
+  mergeNumberingXml(numberingXml: string): void {
+    this.mergePart("/word/numbering.xml", "numbering", "numbering+xml", numberingXml);
+  }
+
+  private mergePart(
+    partName: string,
+    rootLocalName: string,
+    contentTypeSuffix: string,
+    importedXml: string
+  ): void {
+    const importedRoot = new DOMParser().parseFromString(importedXml, "text/xml").documentElement;
+    if (!importedRoot) return;
+    const existingRoot =
+      findPartRoot(this.xmlDoc, partName) ??
+      this.createPart(partName, rootLocalName, contentTypeSuffix);
+    for (const child of Array.from(importedRoot.childNodes)) {
+      if (child.nodeType === ELEMENT_NODE) {
+        existingRoot.appendChild(this.xmlDoc.importNode(child as Element, true));
+      }
+    }
+  }
+
+  private createPart(partName: string, rootLocalName: string, contentTypeSuffix: string): Element {
+    const packageRoot = this.xmlDoc.documentElement;
+    if (!packageRoot) {
+      throw new Error("FlatOpcDocument.createPart: seed OOXML has no package root");
+    }
+    const part = this.xmlDoc.createElementNS(PKG_NS, "pkg:part");
+    part.setAttributeNS(PKG_NS, "pkg:name", partName);
+    part.setAttributeNS(
+      PKG_NS,
+      "pkg:contentType",
+      `application/vnd.openxmlformats-officedocument.wordprocessingml.${contentTypeSuffix}`
+    );
+    const xmlData = this.xmlDoc.createElementNS(PKG_NS, "pkg:xmlData");
+    const root = this.xmlDoc.createElementNS(W_NS, `w:${rootLocalName}`);
+    xmlData.appendChild(root);
+    part.appendChild(xmlData);
+    packageRoot.appendChild(part);
+    return root;
+  }
+
   // Design spec's "Core document model" lists `search(pattern)` as one of
   // FlatOpcDocument's primitives, alongside insertAt/deleteNode. Plain
   // substring matching only (issue #13: wildcard syntax and other
