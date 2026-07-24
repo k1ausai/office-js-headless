@@ -20,8 +20,8 @@ function globalRecord(): Record<string, unknown> {
 }
 
 export function installHeadlessOffice(options: InstallHeadlessOfficeOptions): HeadlessOfficeHandle {
-  const doc = new FlatOpcDocument(options.seedOoxml);
   const platform = options.platform ?? "PC";
+  const doc = new FlatOpcDocument(options.seedOoxml, platform);
 
   const wordGlobal = {
     run: <T>(callback: (context: RequestContext) => Promise<T>) => wordRun(doc, platform, callback),
