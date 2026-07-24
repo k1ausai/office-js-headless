@@ -68,6 +68,13 @@ describe("FlatOpcDocument", () => {
     expect(ooxml.indexOf("After the section break.")).toBeLessThan(bodyTrailingSectPrIndex);
   });
 
+  it("getBodyText() joins each paragraph's text, in document order, with newlines", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    doc.appendParagraph("Second paragraph.");
+    doc.appendParagraph("Third paragraph.");
+    expect(doc.getBodyText()).toBe("Seed paragraph.\nSecond paragraph.\nThird paragraph.");
+  });
+
   it("reset() restores the document to its originally-seeded state", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
     doc.appendParagraph("Will be reset away.");
