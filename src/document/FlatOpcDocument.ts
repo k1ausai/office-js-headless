@@ -11,6 +11,7 @@ const W14_NS = "http://schemas.microsoft.com/office/word/2010/wordml";
 const W15_NS = "http://schemas.microsoft.com/office/word/2012/wordml";
 const PKG_NS = "http://schemas.microsoft.com/office/2006/xmlPackage";
 const ELEMENT_NODE = 1;
+const TEXT_NODE = 3;
 
 // Matches real Word.StyleType's string values. Shared with word/style.ts's
 // Style.type, rather than each side declaring its own copy of this union.
@@ -45,6 +46,19 @@ function findDirectChildElementsNS(
       child.namespaceURI === namespaceURI &&
       child.localName === localName
     ) {
+      result.push(child as Element);
+    }
+  }
+  return result;
+}
+
+// Namespace-less direct-children search — for parsed HTML fragments
+// (htmlToParagraphs()), which have no XML namespace at all, unlike every
+// other element this class handles.
+function findDirectChildElementsByLocalName(parent: Element, localName: string): Element[] {
+  const result: Element[] = [];
+  for (const child of parent.childNodes) {
+    if (child.nodeType === ELEMENT_NODE && (child as Element).localName === localName) {
       result.push(child as Element);
     }
   }
@@ -253,22 +267,23 @@ export class FlatOpcDocument {
     });
   }
 
-  insertOoxmlBefore(target: Element, ooxml: string): Element[] {
-    const nodes = this.importOoxmlParagraphs(ooxml);
+  // Shared splice primitives — the spatial logic behind both insertOoxml*
+  // and insertHtml*, which differ only in how their paragraph nodes are
+  // produced (importing an external OOXML fragment vs. converting an HTML
+  // fragment). Each takes already-built paragraph Elements.
+  private spliceBefore(target: Element, nodes: Element[]): void {
     if (!target.parentNode) {
-      throw new Error("FlatOpcDocument.insertOoxmlBefore: target has no parent");
+      throw new Error("FlatOpcDocument.spliceBefore: target has no parent");
     }
     for (const node of nodes) {
       target.parentNode.insertBefore(node, target);
     }
-    return nodes;
   }
 
-  insertOoxmlAfter(target: Element, ooxml: string): Element[] {
-    const nodes = this.importOoxmlParagraphs(ooxml);
+  private spliceAfter(target: Element, nodes: Element[]): void {
     const parent = target.parentNode;
     if (!parent) {
-      throw new Error("FlatOpcDocument.insertOoxmlAfter: target has no parent");
+      throw new Error("FlatOpcDocument.spliceAfter: target has no parent");
     }
     // Only the paragraph immediately adjacent to the anchor mark-shifts —
     // the confirmed evidence (ticket 006) only covers a single inserted
@@ -282,31 +297,25 @@ export class FlatOpcDocument {
       this.insertNodeAfterAnchor(parent, anchor, node);
       anchor = node;
     }
-    return nodes;
   }
 
-  insertOoxmlAsFirstChild(ooxml: string): Element[] {
+  private spliceAsFirstChild(nodes: Element[]): void {
     const body = this.bodyElement;
-    const nodes = this.importOoxmlParagraphs(ooxml);
     const anchor = body.firstChild;
     for (const node of nodes) {
       // insertBefore(node, null) appends — correctly handles an empty body.
       body.insertBefore(node, anchor);
     }
-    return nodes;
   }
 
-  insertOoxmlAsLastChild(ooxml: string): Element[] {
-    const nodes = this.importOoxmlParagraphs(ooxml);
+  private spliceAsLastChild(nodes: Element[]): void {
     for (const node of nodes) {
       this.bodyElement.insertBefore(node, this.trailingMark);
     }
-    return nodes;
   }
 
-  replaceOoxmlBodyContent(ooxml: string): Element[] {
+  private spliceReplaceBody(nodes: Element[]): void {
     const body = this.bodyElement;
-    const nodes = this.importOoxmlParagraphs(ooxml);
     while (body.firstChild) {
       body.removeChild(body.firstChild);
     }
@@ -314,20 +323,156 @@ export class FlatOpcDocument {
       body.appendChild(node);
     }
     this.ensureTrailingMark();
-    return nodes;
   }
 
-  replaceOoxmlAtTarget(target: Element, ooxml: string): Element[] {
-    const nodes = this.importOoxmlParagraphs(ooxml);
+  private spliceReplaceAtTarget(target: Element, nodes: Element[]): void {
     const parent = target.parentNode;
     if (!parent) {
-      throw new Error("FlatOpcDocument.replaceOoxmlAtTarget: target has no parent");
+      throw new Error("FlatOpcDocument.spliceReplaceAtTarget: target has no parent");
     }
     for (const node of nodes) {
       parent.insertBefore(node, target);
     }
     parent.removeChild(target);
+  }
+
+  insertOoxmlBefore(target: Element, ooxml: string): Element[] {
+    const nodes = this.importOoxmlParagraphs(ooxml);
+    this.spliceBefore(target, nodes);
     return nodes;
+  }
+
+  insertOoxmlAfter(target: Element, ooxml: string): Element[] {
+    const nodes = this.importOoxmlParagraphs(ooxml);
+    this.spliceAfter(target, nodes);
+    return nodes;
+  }
+
+  insertOoxmlAsFirstChild(ooxml: string): Element[] {
+    const nodes = this.importOoxmlParagraphs(ooxml);
+    this.spliceAsFirstChild(nodes);
+    return nodes;
+  }
+
+  insertOoxmlAsLastChild(ooxml: string): Element[] {
+    const nodes = this.importOoxmlParagraphs(ooxml);
+    this.spliceAsLastChild(nodes);
+    return nodes;
+  }
+
+  replaceOoxmlBodyContent(ooxml: string): Element[] {
+    const nodes = this.importOoxmlParagraphs(ooxml);
+    this.spliceReplaceBody(nodes);
+    return nodes;
+  }
+
+  replaceOoxmlAtTarget(target: Element, ooxml: string): Element[] {
+    const nodes = this.importOoxmlParagraphs(ooxml);
+    this.spliceReplaceAtTarget(target, nodes);
+    return nodes;
+  }
+
+  // insertHtml's real-Word behavior (design spec's "Platform selection":
+  // fully supported on every platform, no divergence to model) — unlike
+  // insertOoxml, never platform-gated. Location semantics mirror
+  // insertOoxml* exactly (same spliceX primitives), differing only in how
+  // paragraph nodes are produced: htmlToParagraphs() instead of
+  // importOoxmlParagraphs().
+  insertHtmlBefore(target: Element, html: string): Element[] {
+    const nodes = this.htmlToParagraphs(html);
+    this.spliceBefore(target, nodes);
+    return nodes;
+  }
+
+  insertHtmlAfter(target: Element, html: string): Element[] {
+    const nodes = this.htmlToParagraphs(html);
+    this.spliceAfter(target, nodes);
+    return nodes;
+  }
+
+  insertHtmlAsFirstChild(html: string): Element[] {
+    const nodes = this.htmlToParagraphs(html);
+    this.spliceAsFirstChild(nodes);
+    return nodes;
+  }
+
+  insertHtmlAsLastChild(html: string): Element[] {
+    const nodes = this.htmlToParagraphs(html);
+    this.spliceAsLastChild(nodes);
+    return nodes;
+  }
+
+  replaceHtmlBodyContent(html: string): Element[] {
+    const nodes = this.htmlToParagraphs(html);
+    this.spliceReplaceBody(nodes);
+    return nodes;
+  }
+
+  replaceHtmlAtTarget(target: Element, html: string): Element[] {
+    const nodes = this.htmlToParagraphs(html);
+    this.spliceReplaceAtTarget(target, nodes);
+    return nodes;
+  }
+
+  // Real Word's HTML-to-OOXML conversion is undocumented/proprietary —
+  // replicating it exactly is out of scope. This is a structurally-
+  // reasonable, best-effort mapping for the common formatting cases issue
+  // #18 actually asks for (paragraphs, bold, italic) — not a general HTML5
+  // parser. Input must be well-formed XML (void elements like <br/> must
+  // be self-closed; HTML entities beyond XML's built-in five aren't
+  // resolved). Bare inline content with no <p> wrapper becomes one
+  // paragraph, matching real Word's behavior for an unwrapped HTML
+  // fragment.
+  private htmlToParagraphs(html: string): Element[] {
+    const parsed = new DOMParser().parseFromString(`<root>${html}</root>`, "text/xml");
+    const root = parsed.documentElement;
+    if (!root) {
+      throw new Error("FlatOpcDocument.htmlToParagraphs: failed to parse html fragment");
+    }
+    const topLevelParagraphs = findDirectChildElementsByLocalName(root, "p");
+    const sourceNodes = topLevelParagraphs.length > 0 ? topLevelParagraphs : [root];
+    return sourceNodes.map((node) => {
+      const paragraph = this.xmlDoc.createElementNS(W_NS, "w:p");
+      for (const run of this.htmlNodeToRuns(node, false, false)) {
+        paragraph.appendChild(run);
+      }
+      assignFreshIds(paragraph);
+      return paragraph;
+    });
+  }
+
+  private htmlNodeToRuns(node: Element, bold: boolean, italic: boolean): Element[] {
+    const runs: Element[] = [];
+    for (const child of node.childNodes) {
+      if (child.nodeType === TEXT_NODE) {
+        const text = child.nodeValue ?? "";
+        if (text) runs.push(this.createFormattedRun(text, bold, italic));
+      } else if (child.nodeType === ELEMENT_NODE) {
+        const tag = (child as Element).localName?.toLowerCase() ?? "";
+        runs.push(
+          ...this.htmlNodeToRuns(
+            child as Element,
+            bold || tag === "b" || tag === "strong",
+            italic || tag === "i" || tag === "em"
+          )
+        );
+      }
+    }
+    return runs;
+  }
+
+  private createFormattedRun(text: string, bold: boolean, italic: boolean): Element {
+    const run = this.xmlDoc.createElementNS(W_NS, "w:r");
+    if (bold || italic) {
+      const rPr = this.xmlDoc.createElementNS(W_NS, "w:rPr");
+      if (bold) rPr.appendChild(this.xmlDoc.createElementNS(W_NS, "w:b"));
+      if (italic) rPr.appendChild(this.xmlDoc.createElementNS(W_NS, "w:i"));
+      run.appendChild(rPr);
+    }
+    const textNode = this.xmlDoc.createElementNS(W_NS, "w:t");
+    textNode.appendChild(this.xmlDoc.createTextNode(text));
+    run.appendChild(textNode);
+    return run;
   }
 
   getParagraphText(paragraph: Element): string {

@@ -1,6 +1,9 @@
 import { FlatOpcDocument } from "../document/FlatOpcDocument";
 import { SupportedPlatform } from "../office/context";
 import { bodyInsertEnd } from "../operations/bodyInsertEnd";
+import { bodyInsertHtmlEnd } from "../operations/bodyInsertHtmlEnd";
+import { bodyInsertHtmlReplace } from "../operations/bodyInsertHtmlReplace";
+import { bodyInsertHtmlStart } from "../operations/bodyInsertHtmlStart";
 import { bodyInsertOoxmlEnd } from "../operations/bodyInsertOoxmlEnd";
 import { bodyInsertOoxmlReplace } from "../operations/bodyInsertOoxmlReplace";
 import { bodyInsertOoxmlStart } from "../operations/bodyInsertOoxmlStart";
@@ -34,6 +37,12 @@ const OOXML_LOCATION_HANDLERS: Partial<Record<InsertLocationValue, LocationHandl
   [InsertLocation.replace]: bodyInsertOoxmlReplace,
 };
 
+const HTML_LOCATION_HANDLERS: Partial<Record<InsertLocationValue, LocationHandler>> = {
+  [InsertLocation.start]: bodyInsertHtmlStart,
+  [InsertLocation.end]: bodyInsertHtmlEnd,
+  [InsertLocation.replace]: bodyInsertHtmlReplace,
+};
+
 export class Body {
   private readonly tracked = new TrackedProperties();
 
@@ -65,6 +74,14 @@ export class Body {
       }
       handler(this.doc, ooxml);
     });
+  }
+
+  // Never platform-gated, unlike insertOoxml — design spec's "Platform
+  // selection": insertHtml is fully supported on every platform, no
+  // divergence to model (it's real add-in code's actual fallback route
+  // around insertOoxml's OfficeOnline gap).
+  insertHtml(html: string, insertLocation: InsertLocationValue): void {
+    this.dispatch(HTML_LOCATION_HANDLERS, html, insertLocation, "Body.insertHtml");
   }
 
   private dispatch(
