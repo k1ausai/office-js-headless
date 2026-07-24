@@ -1,6 +1,15 @@
+import { type Element } from "@xmldom/xmldom";
 import { describe, expect, it } from "vitest";
 import { FlatOpcDocument } from "./FlatOpcDocument";
 import { MINIMAL_SEED_OOXML } from "./__fixtures__/minimalSeed";
+
+const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+function firstParagraph(doc: FlatOpcDocument): Element {
+  const paragraph = doc.bodyElement.getElementsByTagNameNS(W_NS, "p")[0];
+  if (!paragraph) throw new Error("test fixture has no <w:p>");
+  return paragraph;
+}
 
 describe("FlatOpcDocument", () => {
   it("parses the seed and round-trips it unchanged through getOoxml()", () => {
@@ -73,6 +82,72 @@ describe("FlatOpcDocument", () => {
     doc.appendParagraph("Second paragraph.");
     doc.appendParagraph("Third paragraph.");
     expect(doc.getBodyText()).toBe("Seed paragraph.\nSecond paragraph.\nThird paragraph.");
+  });
+
+  it("insertParagraphBefore splices a new paragraph immediately before the target", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    doc.insertParagraphBefore(firstParagraph(doc), "Before.");
+    const ooxml = doc.getOoxml();
+    expect(ooxml.indexOf("Before.")).toBeLessThan(ooxml.indexOf("Seed paragraph."));
+  });
+
+  it("insertParagraphAfter splices a new paragraph immediately after the target", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const seedParagraph = firstParagraph(doc);
+    doc.appendParagraph("Gamma.");
+    doc.insertParagraphAfter(seedParagraph, "After.");
+    const ooxml = doc.getOoxml();
+    expect(ooxml.indexOf("Seed paragraph.")).toBeLessThan(ooxml.indexOf("After."));
+    expect(ooxml.indexOf("After.")).toBeLessThan(ooxml.indexOf("Gamma."));
+  });
+
+  it("replaceParagraphContent swaps the target paragraph's text entirely", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    doc.replaceParagraphContent(firstParagraph(doc), "Replaced.");
+    const ooxml = doc.getOoxml();
+    expect(ooxml).toContain("Replaced.");
+    expect(ooxml).not.toContain("Seed paragraph.");
+  });
+
+  it("prependTextInParagraph inserts text at the start of the target paragraph's content", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const seedParagraph = firstParagraph(doc);
+    doc.prependTextInParagraph(seedParagraph, "PREPENDED ");
+    expect(doc.getParagraphText(seedParagraph)).toBe("PREPENDED Seed paragraph.");
+  });
+
+  it("appendTextInParagraph inserts text at the end of the target paragraph's content", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const seedParagraph = firstParagraph(doc);
+    doc.appendTextInParagraph(seedParagraph, " APPENDED");
+    expect(doc.getParagraphText(seedParagraph)).toBe("Seed paragraph. APPENDED");
+  });
+
+  it("insertParagraphAsFirstChild inserts before all existing content", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    doc.insertParagraphAsFirstChild("First now.");
+    const ooxml = doc.getOoxml();
+    expect(ooxml.indexOf("First now.")).toBeLessThan(ooxml.indexOf("Seed paragraph."));
+  });
+
+  it("insertParagraphAsFirstChild works on a body with no existing paragraphs", () => {
+    const emptyBodySeed = MINIMAL_SEED_OOXML.replace(
+      /<w:p w14:paraId="00000001">[\s\S]*?<\/w:p>/,
+      ""
+    );
+    const doc = new FlatOpcDocument(emptyBodySeed);
+    expect(() => doc.insertParagraphAsFirstChild("Only paragraph.")).not.toThrow();
+    expect(doc.getOoxml()).toContain("Only paragraph.");
+  });
+
+  it("replaceBodyContent clears the whole body and inserts one paragraph", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    doc.appendParagraph("Second paragraph.");
+    doc.replaceBodyContent("Only this remains.");
+    const ooxml = doc.getOoxml();
+    expect(ooxml).toContain("Only this remains.");
+    expect(ooxml).not.toContain("Seed paragraph.");
+    expect(ooxml).not.toContain("Second paragraph.");
   });
 
   it("reset() restores the document to its originally-seeded state", () => {

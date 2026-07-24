@@ -4,6 +4,60 @@ import { MINIMAL_SEED_OOXML } from "../document/__fixtures__/minimalSeed";
 import { InsertLocation } from "./insertLocation";
 import { wordRun } from "./run";
 
+describe("Body InsertLocation dispatch", () => {
+  it("Start inserts a new paragraph as the first child", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, async (context) => {
+      context.document.body.insertText("New first.", InsertLocation.start);
+      await context.sync();
+    });
+    const ooxml = doc.getOoxml();
+    expect(ooxml.indexOf("New first.")).toBeLessThan(ooxml.indexOf("Seed paragraph."));
+  });
+
+  it("End inserts a new paragraph as the last child", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, async (context) => {
+      context.document.body.insertText("New last.", InsertLocation.end);
+      await context.sync();
+    });
+    const ooxml = doc.getOoxml();
+    expect(ooxml.indexOf("Seed paragraph.")).toBeLessThan(ooxml.indexOf("New last."));
+  });
+
+  it("Replace clears the whole body and inserts one paragraph", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, async (context) => {
+      context.document.body.insertText("Only this.", InsertLocation.replace);
+      await context.sync();
+    });
+    const ooxml = doc.getOoxml();
+    expect(ooxml).toContain("Only this.");
+    expect(ooxml).not.toContain("Seed paragraph.");
+  });
+
+  it("Before/After are not applicable to Body and reject at sync()", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, async (context) => {
+      context.document.body.insertText("x", InsertLocation.before);
+      await expect(context.sync()).rejects.toThrow(/InsertLocation/);
+    });
+    await wordRun(doc, async (context) => {
+      context.document.body.insertText("x", InsertLocation.after);
+      await expect(context.sync()).rejects.toThrow(/InsertLocation/);
+    });
+  });
+
+  it("insertParagraph behaves the same as insertText for Body (both always create a new paragraph)", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, async (context) => {
+      context.document.body.insertParagraph("Via insertParagraph.", InsertLocation.end);
+      await context.sync();
+    });
+    expect(doc.getOoxml()).toContain("Via insertParagraph.");
+  });
+});
+
 describe("Body load/sync gating", () => {
   it("reading .text without calling .load() first throws PropertyNotLoaded", async () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
