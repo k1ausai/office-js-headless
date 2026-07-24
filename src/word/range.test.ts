@@ -135,3 +135,66 @@ describe("Range InsertLocation dispatch", () => {
     expect(() => range.insertOoxml("<pkg:package/>", InsertLocation.after)).toThrow();
   });
 });
+
+describe("Range core operations", () => {
+  it("getOoxml returns a range-scoped Flat-OPC package containing only this range's paragraph", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    doc.appendParagraph("Other paragraph.");
+    const target = firstParagraph(doc);
+    const range = new Range(doc, target, "PC", immediateEnqueue);
+
+    const rangeOoxml = range.getOoxml();
+
+    expect(rangeOoxml).toContain("<pkg:package");
+    expect(rangeOoxml).toContain("Seed paragraph.");
+    expect(rangeOoxml).not.toContain("Other paragraph.");
+  });
+
+  it("delete removes the range's paragraph from the document, deferred until sync (via enqueue)", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const target = firstParagraph(doc);
+    doc.appendParagraph("Survivor.");
+    const queue: Array<() => void> = [];
+    const range = new Range(doc, target, "PC", (op) => queue.push(op));
+
+    range.delete();
+    expect(doc.getOoxml()).toContain("Seed paragraph.");
+
+    queue.forEach((op) => op());
+    expect(doc.getOoxml()).not.toContain("Seed paragraph.");
+    expect(doc.getOoxml()).toContain("Survivor.");
+  });
+
+  it("select is queryable without throwing and never mutates document content, for every selection mode", () => {
+    for (const mode of [undefined, "Select", "Start", "End"] as const) {
+      const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+      const target = firstParagraph(doc);
+      const before = doc.getBodyText();
+      const range = new Range(doc, target, "PC", immediateEnqueue);
+
+      expect(() => range.select(mode)).not.toThrow();
+      expect(doc.getBodyText()).toBe(before);
+    }
+  });
+
+  it("getRange returns a new Range wrapping the same paragraph, for every rangeLocation — whole-paragraph granularity has no sub-position to distinguish", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const target = firstParagraph(doc);
+    const range = new Range(doc, target, "PC", immediateEnqueue);
+
+    for (const location of [
+      "Whole",
+      "Start",
+      "End",
+      "Before",
+      "After",
+      "Content",
+      undefined,
+    ] as const) {
+      const subRange = range.getRange(location);
+      subRange.insertText("PREPENDED ", InsertLocation.start);
+      expect(doc.getParagraphText(target)).toContain("PREPENDED");
+      doc.replaceParagraphContent(target, "Seed paragraph.");
+    }
+  });
+});

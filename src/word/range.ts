@@ -15,7 +15,9 @@ import { rangeParagraphInsertStart } from "../operations/rangeParagraphInsertSta
 import { rangeReplace } from "../operations/rangeReplace";
 import { assertOoxmlSupported } from "./errors";
 import { InsertLocation, InsertLocationValue } from "./insertLocation";
+import { RangeLocation, RangeLocationValue } from "./rangeLocation";
 import type { QueuedOperation } from "./run";
+import { SelectionMode, SelectionModeValue } from "./selectionMode";
 
 type LocationHandler = (doc: FlatOpcDocument, target: Element, text: string) => void;
 
@@ -47,11 +49,14 @@ const OOXML_LOCATION_HANDLERS: Record<InsertLocationValue, LocationHandler> = {
   [InsertLocation.replace]: rangeInsertOoxmlReplace,
 };
 
-// MVP scope (issue #9): wraps exactly one whole <w:p> — no sub-paragraph
-// offsets yet. Full Range mechanics (getOoxml, delete, select, search,
-// arbitrary sub-paragraph spans) are issue #12's job; this class only proves
-// InsertLocation splicing is correct per receiver type. Not yet reachable
-// from Body (no body.getRange() factory yet — also #12).
+// Whole-paragraph granularity, permanently: wraps exactly one whole <w:p>,
+// no sub-paragraph character offsets (design spec's Range model doesn't
+// track cursor position within a paragraph — that's out of scope for v1,
+// not deferred to a later issue). search() (#13) is the other source of
+// Range instances; getRange() below returns more of the same shape. Not yet
+// reachable from Word.run's context — Body has no getRange() factory in the
+// design spec's v1 API coverage; Paragraph.getRange() (#14) and search()
+// (#13) are the actual entry points, still to come.
 export class Range {
   constructor(
     private readonly doc: FlatOpcDocument,
@@ -73,6 +78,32 @@ export class Range {
       assertOoxmlSupported(this.platform);
       OOXML_LOCATION_HANDLERS[insertLocation](this.doc, this.target, ooxml);
     });
+  }
+
+  getOoxml(): string {
+    return this.doc.getRangeOoxml(this.target);
+  }
+
+  delete(): void {
+    this.enqueue(() => {
+      this.doc.deleteNode(this.target);
+    });
+  }
+
+  // Real select() changes UI selection — inherently unobservable in a
+  // headless shim with no UI. Still enqueued, matching every other Range
+  // action method's deferred-until-sync() timing, but applies no document
+  // mutation.
+  select(_selectionMode: SelectionModeValue = SelectionMode.select): void {
+    this.enqueue(() => {});
+  }
+
+  // Whole-paragraph granularity means Start/End/After/Content/Whole can't be
+  // distinguished — there's no sub-paragraph position to collapse to, so
+  // every rangeLocation returns a new Range over the same paragraph. Never
+  // wrong, just not as precise as real Word's character-level cursor.
+  getRange(_rangeLocation: RangeLocationValue = RangeLocation.whole): Range {
+    return new Range(this.doc, this.target, this.platform, this.enqueue);
   }
 
   private insert(

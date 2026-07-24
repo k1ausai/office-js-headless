@@ -294,15 +294,66 @@ export class FlatOpcDocument {
     return paragraphText(paragraph);
   }
 
+  // Shared by getOoxml() and getRangeOoxml() — the design spec's "ParaId
+  // stability model" is explicit that OfficeOnline regenerates ids "for the
+  // whole document" on "Body or any Range" reads alike.
+  private churnIdsForOfficeOnlineRead(): void {
+    regenerateAllIdsForOfficeOnline([...this.getRealParagraphs(), this.trailingMark]);
+  }
+
   getOoxml(): string {
     if (this.platform === "OfficeOnline") {
-      regenerateAllIdsForOfficeOnline([...this.getRealParagraphs(), this.trailingMark]);
+      this.churnIdsForOfficeOnlineRead();
     } else {
-      // PC/Mac: real content stays stable across reads — only the trailing
-      // mark churns, on every single call, regardless of edits.
+      // PC/Mac: real content stays stable across whole-document reads —
+      // only the trailing mark churns, on every single call, regardless of
+      // edits.
       assignFreshIds(this.trailingMark);
     }
     return new XMLSerializer().serializeToString(this.xmlDoc);
+  }
+
+  // Range.getOoxml()'s real shape: a range-scoped fragment re-wrapped as its
+  // own Flat-OPC package, not the whole document (design spec's "Core
+  // document model"). The target's own serialization already carries its
+  // required namespace declarations inline (xmldom adds them automatically
+  // when a subtree is serialized outside its full ancestor chain), so the
+  // wrapper only needs to declare the main `w:` namespace for its own
+  // <w:document>/<w:body> elements.
+  //
+  // No PC/Mac trailing-mark churn here, unlike getOoxml(): the mark is never
+  // part of a range-scoped fragment's output, so churning it would be a
+  // side effect with no observable justification — the spec's "churns every
+  // call" language describes Body's whole-document reads specifically, and
+  // extending it to scoped Range reads would be an unconfirmed guess, not a
+  // modeled behavior (same caution as paraId.ts's rsid omission).
+  getRangeOoxml(target: Element): string {
+    if (this.platform === "OfficeOnline") {
+      this.churnIdsForOfficeOnlineRead();
+    }
+    const targetXml = new XMLSerializer().serializeToString(target);
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
+  <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
+    <pkg:xmlData>
+      <w:document xmlns:w="${W_NS}">
+        <w:body>
+          ${targetXml}
+        </w:body>
+      </w:document>
+    </pkg:xmlData>
+  </pkg:part>
+</pkg:package>
+`;
+  }
+
+  // Design spec's "Core document model" lists `deleteNode` as one of
+  // FlatOpcDocument's low-level mutation primitives, alongside insertAt/search.
+  deleteNode(target: Element): void {
+    if (!target.parentNode) {
+      throw new Error("FlatOpcDocument.deleteNode: target has no parent");
+    }
+    target.parentNode.removeChild(target);
   }
 
   getBodyText(): string {

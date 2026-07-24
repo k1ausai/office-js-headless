@@ -288,4 +288,38 @@ describe("FlatOpcDocument", () => {
     expect(doc.getOoxml()).not.toContain("Will be reset away.");
     expect(doc.getOoxml()).toContain("Seed paragraph.");
   });
+
+  it("deleteNode removes the target paragraph, leaving the rest of the body intact", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const target = firstParagraph(doc);
+    doc.appendParagraph("Survivor.");
+
+    doc.deleteNode(target);
+
+    expect(doc.getOoxml()).not.toContain("Seed paragraph.");
+    expect(doc.getOoxml()).toContain("Survivor.");
+  });
+
+  it("getRangeOoxml serializes only the target paragraph, wrapped as its own Flat-OPC package", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    doc.appendParagraph("Other paragraph.");
+    const target = firstParagraph(doc);
+
+    const rangeOoxml = doc.getRangeOoxml(target);
+
+    expect(rangeOoxml).toContain("<pkg:package");
+    expect(rangeOoxml).toContain("Seed paragraph.");
+    expect(rangeOoxml).not.toContain("Other paragraph.");
+  });
+
+  it("getRangeOoxml on OfficeOnline churns the target's ids just like a whole-document read would", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML, "OfficeOnline");
+    const target = firstParagraph(doc);
+    const paraIdPattern = /w14:paraId="([0-9A-F]{8})"/;
+
+    const firstRead = doc.getRangeOoxml(target);
+    const secondRead = doc.getRangeOoxml(target);
+
+    expect(firstRead.match(paraIdPattern)?.[1]).not.toBe(secondRead.match(paraIdPattern)?.[1]);
+  });
 });
