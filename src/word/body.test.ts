@@ -1,3 +1,4 @@
+import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import { COMMENT_SEED_OOXML } from "../document/__fixtures__/commentSeed";
 import { FlatOpcDocument } from "../document/FlatOpcDocument";
@@ -5,6 +6,17 @@ import { MINIMAL_SEED_OOXML } from "../document/__fixtures__/minimalSeed";
 import { TABLE_SEED_OOXML } from "../document/__fixtures__/tableSeed";
 import { InsertLocation } from "./insertLocation";
 import { wordRun } from "./run";
+
+const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+// Builds a minimal in-memory .docx-shaped zip (just the one part these
+// tests need — real .docx files have many more) and returns it base64
+// encoded, matching what Body.insertFileFromBase64 actually receives.
+async function buildBase64Docx(stylesXml?: string): Promise<string> {
+  const zip = new JSZip();
+  if (stylesXml) zip.file("word/styles.xml", stylesXml);
+  return zip.generateAsync({ type: "base64" });
+}
 
 describe("Body InsertLocation dispatch", () => {
   it("Start inserts a new paragraph as the first child", async () => {
@@ -82,6 +94,46 @@ describe("Body.insertHtml", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
     await wordRun(doc, "PC", async (context) => {
       context.document.body.insertHtml("<p>x</p>", InsertLocation.before);
+      await expect(context.sync()).rejects.toThrow(/InsertLocation/);
+    });
+  });
+});
+
+describe("Body.insertFileFromBase64", () => {
+  it("on PC/Mac: unzips the base64 .docx and merges its styles.xml into the current document", async () => {
+    const base64Docx = await buildBase64Docx(
+      `<w:styles xmlns:w="${W_NS}"><w:style w:type="paragraph" w:styleId="Imported"><w:name w:val="Imported"/></w:style></w:styles>`
+    );
+
+    for (const platform of ["PC", "Mac"] as const) {
+      const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML, platform);
+      await wordRun(doc, platform, async (context) => {
+        context.document.body.insertFileFromBase64(base64Docx, InsertLocation.end);
+        await context.sync();
+
+        const styles = context.document.getStyles();
+        styles.forEach((s) => s.load("id"));
+        await context.sync();
+
+        expect(styles.map((s) => s.id)).toEqual(["Imported"]);
+      });
+    }
+  });
+
+  it("on OfficeOnline: rejects at sync() — no client-side implementation, matching real Word Online", async () => {
+    const base64Docx = await buildBase64Docx();
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML, "OfficeOnline");
+    await wordRun(doc, "OfficeOnline", async (context) => {
+      context.document.body.insertFileFromBase64(base64Docx, InsertLocation.end);
+      await expect(context.sync()).rejects.toThrow(/insertFileFromBase64/);
+    });
+  });
+
+  it("Before/After are not applicable to Body and reject at sync()", async () => {
+    const base64Docx = await buildBase64Docx();
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, "PC", async (context) => {
+      context.document.body.insertFileFromBase64(base64Docx, InsertLocation.before);
       await expect(context.sync()).rejects.toThrow(/InsertLocation/);
     });
   });

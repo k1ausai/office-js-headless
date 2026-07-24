@@ -3,7 +3,10 @@ import { SupportedPlatform } from "../office/context";
 import { Body } from "./body";
 import { Style } from "./style";
 
-export type QueuedOperation = () => void;
+// Async is needed for insertFileFromBase64 (#19), which unzips a .docx via
+// jszip — a genuinely asynchronous operation, unlike every other queued
+// mutation. All existing synchronous `() => void` closures remain valid.
+export type QueuedOperation = () => void | Promise<void>;
 
 // Every shim proxy object that tracks loaded properties (Body, and later
 // Range/Paragraph/Table) implements this so RequestContext can snapshot all
@@ -55,7 +58,7 @@ export class RequestContext {
     // must not leave the failed op replayed on the next sync() call.
     const pending = this.queue.splice(0, this.queue.length);
     for (const op of pending) {
-      op();
+      await op();
     }
     // Loaded properties snapshot AFTER mutations apply — real add-in code
     // relies on load()+sync() in the same batch as a mutation seeing the
