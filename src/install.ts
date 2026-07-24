@@ -1,9 +1,12 @@
 import { FlatOpcDocument } from "./document/FlatOpcDocument";
+import { createOfficeGlobal, SupportedPlatform } from "./office/context";
 import { InsertLocation } from "./word/insertLocation";
 import { RequestContext, wordRun } from "./word/run";
 
 export interface InstallHeadlessOfficeOptions {
   seedOoxml: string;
+  /** "PC" | "Mac" | "OfficeOnline" — defaults to "PC". */
+  platform?: SupportedPlatform;
 }
 
 export interface HeadlessOfficeHandle {
@@ -18,18 +21,18 @@ function globalRecord(): Record<string, unknown> {
 
 export function installHeadlessOffice(options: InstallHeadlessOfficeOptions): HeadlessOfficeHandle {
   const doc = new FlatOpcDocument(options.seedOoxml);
+  const platform = options.platform ?? "PC";
 
   const wordGlobal = {
-    run: <T>(callback: (context: RequestContext) => Promise<T>) => wordRun(doc, callback),
+    run: <T>(callback: (context: RequestContext) => Promise<T>) => wordRun(doc, platform, callback),
     InsertLocation,
   };
 
   // Real add-in code references bare global `Word`/`Office` — this is the
   // only way to run it unmodified, so installation mutates globals, same as
-  // the real host injects them. `Office` is an empty placeholder for now;
-  // `Office.context`/`onReady` arrive with platform selection.
+  // the real host injects them.
   globalRecord().Word = wordGlobal;
-  globalRecord().Office = {};
+  globalRecord().Office = createOfficeGlobal(platform);
 
   return {
     getOoxml: () => doc.getOoxml(),

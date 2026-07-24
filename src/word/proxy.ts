@@ -1,15 +1,15 @@
+import { richApiError } from "./errors";
+
 // Real Office.js does not distinguish "property never named in .load()" from
 // "loaded but not yet followed by context.sync()" — both throw the identical
 // error, traced from the shipped runtime (@microsoft/office-js), not just its
 // published types (which document a different, unobserved error name — see
 // doc/wayfinder/tickets/001-error-message-shape.md and 007-error-name-value.md).
 export function propertyNotLoadedError(propertyName: string): Error {
-  const error = new Error(
+  return richApiError(
+    "PropertyNotLoaded",
     `The property '${propertyName}' is not available. Before reading the property's value, call the load method on the containing object and call "context.sync()" on the associated request context.`
   );
-  error.name = "RichApi.Error";
-  (error as Error & { code: string }).code = "PropertyNotLoaded";
-  return error;
 }
 
 // Shared by every shim proxy object (Body, Range, Paragraph, Table, ...):

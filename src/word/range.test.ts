@@ -22,7 +22,7 @@ function immediateEnqueue(op: () => void): void {
 describe("Range InsertLocation dispatch", () => {
   it("Before splices a new sibling paragraph immediately before the range", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
-    const range = new Range(doc, firstParagraph(doc), immediateEnqueue);
+    const range = new Range(doc, firstParagraph(doc), "PC", immediateEnqueue);
     range.insertText("Before.", InsertLocation.before);
     const ooxml = doc.getOoxml();
     expect(ooxml.indexOf("Before.")).toBeLessThan(ooxml.indexOf("Seed paragraph."));
@@ -32,7 +32,7 @@ describe("Range InsertLocation dispatch", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
     const target = firstParagraph(doc);
     doc.appendParagraph("Gamma.");
-    const range = new Range(doc, target, immediateEnqueue);
+    const range = new Range(doc, target, "PC", immediateEnqueue);
     range.insertText("After.", InsertLocation.after);
     const ooxml = doc.getOoxml();
     expect(ooxml.indexOf("Seed paragraph.")).toBeLessThan(ooxml.indexOf("After."));
@@ -42,7 +42,7 @@ describe("Range InsertLocation dispatch", () => {
   it("Start prepends text within the range's own paragraph — no new paragraph", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
     const target = firstParagraph(doc);
-    const range = new Range(doc, target, immediateEnqueue);
+    const range = new Range(doc, target, "PC", immediateEnqueue);
     range.insertText("PREPENDED ", InsertLocation.start);
     expect(doc.getParagraphText(target)).toBe("PREPENDED Seed paragraph.");
     expect(doc.getBodyText().split("\n")).toHaveLength(1);
@@ -51,7 +51,7 @@ describe("Range InsertLocation dispatch", () => {
   it("End appends text within the range's own paragraph — no new paragraph", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
     const target = firstParagraph(doc);
-    const range = new Range(doc, target, immediateEnqueue);
+    const range = new Range(doc, target, "PC", immediateEnqueue);
     range.insertText(" APPENDED", InsertLocation.end);
     expect(doc.getParagraphText(target)).toBe("Seed paragraph. APPENDED");
     expect(doc.getBodyText().split("\n")).toHaveLength(1);
@@ -60,7 +60,7 @@ describe("Range InsertLocation dispatch", () => {
   it("Replace swaps the range's own content entirely", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
     const target = firstParagraph(doc);
-    const range = new Range(doc, target, immediateEnqueue);
+    const range = new Range(doc, target, "PC", immediateEnqueue);
     range.insertText("Replaced.", InsertLocation.replace);
     expect(doc.getParagraphText(target)).toBe("Replaced.");
   });
@@ -68,7 +68,7 @@ describe("Range InsertLocation dispatch", () => {
   it("insertParagraph(Before/After) creates a new sibling paragraph, same as insertText", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
     const target = firstParagraph(doc);
-    const range = new Range(doc, target, immediateEnqueue);
+    const range = new Range(doc, target, "PC", immediateEnqueue);
     range.insertParagraph("New para.", InsertLocation.after);
     const ooxml = doc.getOoxml();
     expect(ooxml.indexOf("Seed paragraph.")).toBeLessThan(ooxml.indexOf("New para."));
@@ -77,7 +77,7 @@ describe("Range InsertLocation dispatch", () => {
   it("insertParagraph(Start/End) creates a new sibling paragraph too — NOT text-within-paragraph like insertText(Start/End)", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
     const target = firstParagraph(doc);
-    const range = new Range(doc, target, immediateEnqueue);
+    const range = new Range(doc, target, "PC", immediateEnqueue);
 
     range.insertParagraph("Start-as-before.", InsertLocation.start);
     expect(doc.getParagraphText(target)).toBe("Seed paragraph.");
@@ -88,7 +88,7 @@ describe("Range InsertLocation dispatch", () => {
   it("insertParagraph(End) collapses to after — new sibling paragraph, target unchanged", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
     const target = firstParagraph(doc);
-    const range = new Range(doc, target, immediateEnqueue);
+    const range = new Range(doc, target, "PC", immediateEnqueue);
 
     range.insertParagraph("End-as-after.", InsertLocation.end);
     expect(doc.getParagraphText(target)).toBe("Seed paragraph.");
@@ -99,8 +99,36 @@ describe("Range InsertLocation dispatch", () => {
   it("insertParagraph(Replace) swaps the range's own content, same as insertText(Replace)", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
     const target = firstParagraph(doc);
-    const range = new Range(doc, target, immediateEnqueue);
+    const range = new Range(doc, target, "PC", immediateEnqueue);
     range.insertParagraph("Replaced via insertParagraph.", InsertLocation.replace);
     expect(doc.getParagraphText(target)).toBe("Replaced via insertParagraph.");
+  });
+
+  it("insertOoxml applies the fragment on PC, splicing it after the target", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const target = firstParagraph(doc);
+    const range = new Range(doc, target, "PC", immediateEnqueue);
+    const fragment = `<?xml version="1.0" encoding="UTF-8"?>
+<pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
+  <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
+    <pkg:xmlData>
+      <w:document xmlns:w="${W_NS}">
+        <w:body>
+          <w:p><w:r><w:t>Fragment content.</w:t></w:r></w:p>
+        </w:body>
+      </w:document>
+    </pkg:xmlData>
+  </pkg:part>
+</pkg:package>`;
+    range.insertOoxml(fragment, InsertLocation.after);
+    const ooxml = doc.getOoxml();
+    expect(ooxml.indexOf("Seed paragraph.")).toBeLessThan(ooxml.indexOf("Fragment content."));
+  });
+
+  it("insertOoxml throws on OfficeOnline (no client-side merge engine there)", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const target = firstParagraph(doc);
+    const range = new Range(doc, target, "OfficeOnline", immediateEnqueue);
+    expect(() => range.insertOoxml("<pkg:package/>", InsertLocation.after)).toThrow();
   });
 });

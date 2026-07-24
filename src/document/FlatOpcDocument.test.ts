@@ -150,6 +150,135 @@ describe("FlatOpcDocument", () => {
     expect(ooxml).not.toContain("Second paragraph.");
   });
 
+  it("insertOoxmlBefore imports and splices the fragment's paragraphs before the target, preserving order", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const target = firstParagraph(doc);
+    const fragment = `<?xml version="1.0" encoding="UTF-8"?>
+<pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
+  <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
+    <pkg:xmlData>
+      <w:document xmlns:w="${W_NS}">
+        <w:body>
+          <w:p><w:r><w:t>Fragment one.</w:t></w:r></w:p>
+          <w:p><w:r><w:t>Fragment two.</w:t></w:r></w:p>
+        </w:body>
+      </w:document>
+    </pkg:xmlData>
+  </pkg:part>
+</pkg:package>`;
+    doc.insertOoxmlBefore(target, fragment);
+    const ooxml = doc.getOoxml();
+    expect(ooxml.indexOf("Fragment one.")).toBeLessThan(ooxml.indexOf("Fragment two."));
+    expect(ooxml.indexOf("Fragment two.")).toBeLessThan(ooxml.indexOf("Seed paragraph."));
+  });
+
+  it("insertOoxmlAfter imports and splices the fragment's paragraphs after the target, preserving order", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const target = firstParagraph(doc);
+    doc.appendParagraph("Gamma.");
+    const fragment = `<?xml version="1.0" encoding="UTF-8"?>
+<pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
+  <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
+    <pkg:xmlData>
+      <w:document xmlns:w="${W_NS}">
+        <w:body>
+          <w:p><w:r><w:t>Fragment one.</w:t></w:r></w:p>
+          <w:p><w:r><w:t>Fragment two.</w:t></w:r></w:p>
+        </w:body>
+      </w:document>
+    </pkg:xmlData>
+  </pkg:part>
+</pkg:package>`;
+    doc.insertOoxmlAfter(target, fragment);
+    const ooxml = doc.getOoxml();
+    expect(ooxml.indexOf("Seed paragraph.")).toBeLessThan(ooxml.indexOf("Fragment one."));
+    expect(ooxml.indexOf("Fragment one.")).toBeLessThan(ooxml.indexOf("Fragment two."));
+    expect(ooxml.indexOf("Fragment two.")).toBeLessThan(ooxml.indexOf("Gamma."));
+  });
+
+  it("insertOoxmlAsFirstChild inserts the fragment's paragraphs before all existing content, preserving order", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const fragment = `<?xml version="1.0" encoding="UTF-8"?>
+<pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
+  <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
+    <pkg:xmlData>
+      <w:document xmlns:w="${W_NS}">
+        <w:body>
+          <w:p><w:r><w:t>Frag one.</w:t></w:r></w:p>
+          <w:p><w:r><w:t>Frag two.</w:t></w:r></w:p>
+        </w:body>
+      </w:document>
+    </pkg:xmlData>
+  </pkg:part>
+</pkg:package>`;
+    doc.insertOoxmlAsFirstChild(fragment);
+    const ooxml = doc.getOoxml();
+    expect(ooxml.indexOf("Frag one.")).toBeLessThan(ooxml.indexOf("Frag two."));
+    expect(ooxml.indexOf("Frag two.")).toBeLessThan(ooxml.indexOf("Seed paragraph."));
+  });
+
+  it("insertOoxmlAsLastChild inserts the fragment's paragraphs after all existing content, before sectPr", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const fragment = `<?xml version="1.0" encoding="UTF-8"?>
+<pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
+  <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
+    <pkg:xmlData>
+      <w:document xmlns:w="${W_NS}">
+        <w:body>
+          <w:p><w:r><w:t>Frag one.</w:t></w:r></w:p>
+        </w:body>
+      </w:document>
+    </pkg:xmlData>
+  </pkg:part>
+</pkg:package>`;
+    doc.insertOoxmlAsLastChild(fragment);
+    const ooxml = doc.getOoxml();
+    expect(ooxml.indexOf("Seed paragraph.")).toBeLessThan(ooxml.indexOf("Frag one."));
+    expect(ooxml.indexOf("Frag one.")).toBeLessThan(ooxml.indexOf("<w:sectPr>"));
+  });
+
+  it("replaceOoxmlBodyContent clears the whole body and inserts the fragment's paragraphs", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const fragment = `<?xml version="1.0" encoding="UTF-8"?>
+<pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
+  <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
+    <pkg:xmlData>
+      <w:document xmlns:w="${W_NS}">
+        <w:body>
+          <w:p><w:r><w:t>Only this.</w:t></w:r></w:p>
+        </w:body>
+      </w:document>
+    </pkg:xmlData>
+  </pkg:part>
+</pkg:package>`;
+    doc.replaceOoxmlBodyContent(fragment);
+    const ooxml = doc.getOoxml();
+    expect(ooxml).toContain("Only this.");
+    expect(ooxml).not.toContain("Seed paragraph.");
+  });
+
+  it("replaceOoxmlAtTarget removes the target and inserts the fragment's paragraphs in its place", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const target = firstParagraph(doc);
+    const fragment = `<?xml version="1.0" encoding="UTF-8"?>
+<pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
+  <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
+    <pkg:xmlData>
+      <w:document xmlns:w="${W_NS}">
+        <w:body>
+          <w:p><w:r><w:t>Replacement one.</w:t></w:r></w:p>
+          <w:p><w:r><w:t>Replacement two.</w:t></w:r></w:p>
+        </w:body>
+      </w:document>
+    </pkg:xmlData>
+  </pkg:part>
+</pkg:package>`;
+    doc.replaceOoxmlAtTarget(target, fragment);
+    const ooxml = doc.getOoxml();
+    expect(ooxml).not.toContain("Seed paragraph.");
+    expect(ooxml.indexOf("Replacement one.")).toBeLessThan(ooxml.indexOf("Replacement two."));
+  });
+
   it("reset() restores the document to its originally-seeded state", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
     doc.appendParagraph("Will be reset away.");

@@ -1,12 +1,19 @@
 import { type Element } from "@xmldom/xmldom";
 import { FlatOpcDocument } from "../document/FlatOpcDocument";
+import { SupportedPlatform, isSetSupported } from "../office/context";
 import { rangeInsertAfter } from "../operations/rangeInsertAfter";
 import { rangeInsertBefore } from "../operations/rangeInsertBefore";
 import { rangeInsertEnd } from "../operations/rangeInsertEnd";
+import { rangeInsertOoxmlAfter } from "../operations/rangeInsertOoxmlAfter";
+import { rangeInsertOoxmlBefore } from "../operations/rangeInsertOoxmlBefore";
+import { rangeInsertOoxmlEnd } from "../operations/rangeInsertOoxmlEnd";
+import { rangeInsertOoxmlReplace } from "../operations/rangeInsertOoxmlReplace";
+import { rangeInsertOoxmlStart } from "../operations/rangeInsertOoxmlStart";
 import { rangeInsertStart } from "../operations/rangeInsertStart";
 import { rangeParagraphInsertEnd } from "../operations/rangeParagraphInsertEnd";
 import { rangeParagraphInsertStart } from "../operations/rangeParagraphInsertStart";
 import { rangeReplace } from "../operations/rangeReplace";
+import { richApiError } from "./errors";
 import { InsertLocation, InsertLocationValue } from "./insertLocation";
 import type { QueuedOperation } from "./run";
 
@@ -32,6 +39,14 @@ const PARAGRAPH_LOCATION_HANDLERS: Record<InsertLocationValue, LocationHandler> 
   [InsertLocation.replace]: rangeReplace,
 };
 
+const OOXML_LOCATION_HANDLERS: Record<InsertLocationValue, LocationHandler> = {
+  [InsertLocation.before]: rangeInsertOoxmlBefore,
+  [InsertLocation.after]: rangeInsertOoxmlAfter,
+  [InsertLocation.start]: rangeInsertOoxmlStart,
+  [InsertLocation.end]: rangeInsertOoxmlEnd,
+  [InsertLocation.replace]: rangeInsertOoxmlReplace,
+};
+
 // MVP scope (issue #9): wraps exactly one whole <w:p> — no sub-paragraph
 // offsets yet. Full Range mechanics (getOoxml, delete, select, search,
 // arbitrary sub-paragraph spans) are issue #12's job; this class only proves
@@ -41,6 +56,7 @@ export class Range {
   constructor(
     private readonly doc: FlatOpcDocument,
     private readonly target: Element,
+    private readonly platform: SupportedPlatform,
     private readonly enqueue: (op: QueuedOperation) => void
   ) {}
 
@@ -50,6 +66,18 @@ export class Range {
 
   insertParagraph(text: string, insertLocation: InsertLocationValue): void {
     this.insert(PARAGRAPH_LOCATION_HANDLERS, text, insertLocation);
+  }
+
+  insertOoxml(ooxml: string, insertLocation: InsertLocationValue): void {
+    this.enqueue(() => {
+      if (!isSetSupported(this.platform, "WordApiDesktop")) {
+        throw richApiError(
+          "GeneralException",
+          "insertOoxml is not supported on this platform (Word Online has no client-side OOXML merge implementation)."
+        );
+      }
+      OOXML_LOCATION_HANDLERS[insertLocation](this.doc, this.target, ooxml);
+    });
   }
 
   private insert(

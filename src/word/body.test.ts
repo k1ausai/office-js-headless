@@ -7,7 +7,7 @@ import { wordRun } from "./run";
 describe("Body InsertLocation dispatch", () => {
   it("Start inserts a new paragraph as the first child", async () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
-    await wordRun(doc, async (context) => {
+    await wordRun(doc, "PC", async (context) => {
       context.document.body.insertText("New first.", InsertLocation.start);
       await context.sync();
     });
@@ -17,7 +17,7 @@ describe("Body InsertLocation dispatch", () => {
 
   it("End inserts a new paragraph as the last child", async () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
-    await wordRun(doc, async (context) => {
+    await wordRun(doc, "PC", async (context) => {
       context.document.body.insertText("New last.", InsertLocation.end);
       await context.sync();
     });
@@ -27,7 +27,7 @@ describe("Body InsertLocation dispatch", () => {
 
   it("Replace clears the whole body and inserts one paragraph", async () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
-    await wordRun(doc, async (context) => {
+    await wordRun(doc, "PC", async (context) => {
       context.document.body.insertText("Only this.", InsertLocation.replace);
       await context.sync();
     });
@@ -38,11 +38,11 @@ describe("Body InsertLocation dispatch", () => {
 
   it("Before/After are not applicable to Body and reject at sync()", async () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
-    await wordRun(doc, async (context) => {
+    await wordRun(doc, "PC", async (context) => {
       context.document.body.insertText("x", InsertLocation.before);
       await expect(context.sync()).rejects.toThrow(/InsertLocation/);
     });
-    await wordRun(doc, async (context) => {
+    await wordRun(doc, "PC", async (context) => {
       context.document.body.insertText("x", InsertLocation.after);
       await expect(context.sync()).rejects.toThrow(/InsertLocation/);
     });
@@ -50,7 +50,7 @@ describe("Body InsertLocation dispatch", () => {
 
   it("insertParagraph behaves the same as insertText for Body (both always create a new paragraph)", async () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
-    await wordRun(doc, async (context) => {
+    await wordRun(doc, "PC", async (context) => {
       context.document.body.insertParagraph("Via insertParagraph.", InsertLocation.end);
       await context.sync();
     });
@@ -62,7 +62,7 @@ describe("Body load/sync gating", () => {
   it("reading .text without calling .load() first throws PropertyNotLoaded", async () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
 
-    await wordRun(doc, async (context) => {
+    await wordRun(doc, "PC", async (context) => {
       expect(() => context.document.body.text).toThrow(/PropertyNotLoaded|not available/);
     });
   });
@@ -70,7 +70,7 @@ describe("Body load/sync gating", () => {
   it("reading .text after .load() but before context.sync() still throws — identical to never-loaded", async () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
 
-    await wordRun(doc, async (context) => {
+    await wordRun(doc, "PC", async (context) => {
       context.document.body.load("text");
       expect(() => context.document.body.text).toThrow(/PropertyNotLoaded|not available/);
     });
@@ -79,7 +79,7 @@ describe("Body load/sync gating", () => {
   it("reading .text after .load() + context.sync() returns the current body text", async () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
 
-    await wordRun(doc, async (context) => {
+    await wordRun(doc, "PC", async (context) => {
       context.document.body.load("text");
       await context.sync();
       expect(context.document.body.text).toBe("Seed paragraph.");
@@ -89,7 +89,7 @@ describe("Body load/sync gating", () => {
   it("reads the post-mutation value when insertText and .load('text') are queued in the same batch", async () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
 
-    await wordRun(doc, async (context) => {
+    await wordRun(doc, "PC", async (context) => {
       context.document.body.insertText("Appended.", InsertLocation.end);
       context.document.body.load("text");
       await context.sync();
@@ -100,7 +100,7 @@ describe("Body load/sync gating", () => {
   it("the error name/code exactly match the confirmed real Office.js shape", async () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
 
-    await wordRun(doc, async (context) => {
+    await wordRun(doc, "PC", async (context) => {
       try {
         void context.document.body.text;
         expect.unreachable("should have thrown");
