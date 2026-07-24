@@ -4,6 +4,11 @@ import { SupportedPlatform } from "../office/context";
 import { rangeInsertAfter } from "../operations/rangeInsertAfter";
 import { rangeInsertBefore } from "../operations/rangeInsertBefore";
 import { rangeInsertEnd } from "../operations/rangeInsertEnd";
+import { rangeInsertHtmlAfter } from "../operations/rangeInsertHtmlAfter";
+import { rangeInsertHtmlBefore } from "../operations/rangeInsertHtmlBefore";
+import { rangeInsertHtmlEnd } from "../operations/rangeInsertHtmlEnd";
+import { rangeInsertHtmlReplace } from "../operations/rangeInsertHtmlReplace";
+import { rangeInsertHtmlStart } from "../operations/rangeInsertHtmlStart";
 import { rangeInsertOoxmlAfter } from "../operations/rangeInsertOoxmlAfter";
 import { rangeInsertOoxmlBefore } from "../operations/rangeInsertOoxmlBefore";
 import { rangeInsertOoxmlEnd } from "../operations/rangeInsertOoxmlEnd";
@@ -50,6 +55,14 @@ const OOXML_LOCATION_HANDLERS: Record<InsertLocationValue, LocationHandler> = {
   [InsertLocation.replace]: rangeInsertOoxmlReplace,
 };
 
+const HTML_LOCATION_HANDLERS: Record<InsertLocationValue, LocationHandler> = {
+  [InsertLocation.before]: rangeInsertHtmlBefore,
+  [InsertLocation.after]: rangeInsertHtmlAfter,
+  [InsertLocation.start]: rangeInsertHtmlStart,
+  [InsertLocation.end]: rangeInsertHtmlEnd,
+  [InsertLocation.replace]: rangeInsertHtmlReplace,
+};
+
 // Whole-paragraph granularity, permanently: wraps exactly one whole <w:p>,
 // no sub-paragraph character offsets (design spec's Range model doesn't
 // track cursor position within a paragraph — that's out of scope for v1,
@@ -90,6 +103,13 @@ export class Range {
       assertOoxmlSupported(this.platform);
       OOXML_LOCATION_HANDLERS[insertLocation](this.doc, this.target, ooxml);
     });
+  }
+
+  // Never platform-gated, unlike insertOoxml — design spec's "Platform
+  // selection": insertHtml is fully supported on every platform, no
+  // divergence to model.
+  insertHtml(html: string, insertLocation: InsertLocationValue): void {
+    this.insert(HTML_LOCATION_HANDLERS, html, insertLocation);
   }
 
   getOoxml(): string {

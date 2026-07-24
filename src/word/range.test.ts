@@ -134,6 +134,18 @@ describe("Range InsertLocation dispatch", () => {
     const range = new Range(doc, target, "OfficeOnline", immediateEnqueue);
     expect(() => range.insertOoxml("<pkg:package/>", InsertLocation.after)).toThrow();
   });
+
+  it("insertHtml applies identically on PC, Mac, and OfficeOnline — never platform-gated, unlike insertOoxml", () => {
+    for (const platform of ["PC", "Mac", "OfficeOnline"] as const) {
+      const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+      const target = firstParagraph(doc);
+      const range = new Range(doc, target, platform, immediateEnqueue);
+      range.insertHtml("<p><b>Bold.</b></p>", InsertLocation.after);
+      const ooxml = doc.getOoxml();
+      expect(ooxml).toContain("<w:b/>");
+      expect(ooxml.indexOf("Seed paragraph.")).toBeLessThan(ooxml.indexOf("Bold."));
+    }
+  });
 });
 
 describe("Range core operations", () => {

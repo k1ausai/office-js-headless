@@ -60,6 +60,33 @@ describe("Body InsertLocation dispatch", () => {
   });
 });
 
+describe("Body.insertHtml", () => {
+  it("applies identically on PC, Mac, and OfficeOnline — the always-works insertOoxml fallback", async () => {
+    for (const platform of ["PC", "Mac", "OfficeOnline"] as const) {
+      const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML, platform);
+      await wordRun(doc, platform, async (context) => {
+        context.document.body.insertHtml(
+          "<p><b>Bold</b> and <i>italic</i>.</p>",
+          InsertLocation.end
+        );
+        await context.sync();
+      });
+      const ooxml = doc.getOoxml();
+      expect(ooxml).toContain("<w:b/>");
+      expect(ooxml).toContain("<w:i/>");
+      expect(doc.getBodyText()).toBe("Seed paragraph.\nBold and italic.");
+    }
+  });
+
+  it("Before/After are not applicable to Body and reject at sync(), same as insertOoxml/insertText", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, "PC", async (context) => {
+      context.document.body.insertHtml("<p>x</p>", InsertLocation.before);
+      await expect(context.sync()).rejects.toThrow(/InsertLocation/);
+    });
+  });
+});
+
 describe("Body.search", () => {
   it("returns a Range for each paragraph whose text contains the search string", async () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
