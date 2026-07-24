@@ -11,6 +11,10 @@ function paraId(el: Element): string | null {
   return el.getAttributeNS(W14_NS, "paraId");
 }
 
+function textId(el: Element): string | null {
+  return el.getAttributeNS(W14_NS, "textId");
+}
+
 function realParagraphs(doc: FlatOpcDocument): Element[] {
   // Mirrors FlatOpcDocument's own private getRealParagraphs() — direct-child
   // <w:p> elements, in document order. Good enough for test purposes: the
@@ -20,10 +24,11 @@ function realParagraphs(doc: FlatOpcDocument): Element[] {
 }
 
 describe("ParaId stability model", () => {
-  it("every newly-created paragraph gets an 8-hex-char uppercase id", () => {
+  it("every newly-created paragraph gets an 8-hex-char uppercase paraId AND textId", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML, "PC");
     const p = doc.appendParagraph("New.");
     expect(paraId(p)).toMatch(HEX_ID);
+    expect(textId(p)).toMatch(HEX_ID);
   });
 
   it("PC: insert-after reassigns the existing paragraph's OLD id onto the new paragraph, gives the existing paragraph a fresh one", () => {
@@ -60,6 +65,28 @@ describe("ParaId stability model", () => {
 
     expect(paraId(first)).toBe(originalFirstId);
     expect(paraId(newPara)).not.toBe(originalFirstId);
+  });
+
+  it("PC/Mac: editing one paragraph's text leaves every OTHER paragraph's id untouched", () => {
+    // Restyling and deletion aren't implemented yet (style is #17, delete is
+    // #12) — this covers the one part of "plain text edits, restyling,
+    // deletion" that's actually testable against the current API surface.
+    // The invariant holds today because nothing outside paraId.ts's own
+    // functions ever touches w14:paraId — not asserted elsewhere.
+    for (const platform of ["PC", "Mac"] as const) {
+      const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML, platform);
+      const target = realParagraphs(doc)[0]!;
+      const second = doc.appendParagraph("Second paragraph.");
+      const secondIdBefore = paraId(second);
+      const targetIdBefore = paraId(target);
+
+      doc.replaceParagraphContent(target, "Edited text.");
+      doc.appendTextInParagraph(target, " More.");
+      doc.prependTextInParagraph(second, "Prefix ");
+
+      expect(paraId(target)).toBe(targetIdBefore);
+      expect(paraId(second)).toBe(secondIdBefore);
+    }
   });
 
   it("PC/Mac: real paragraph ids are stable across multiple getOoxml() calls with no mutation between them", () => {
@@ -117,6 +144,35 @@ describe("ParaId stability model", () => {
     expect(rsids.length).toBeGreaterThan(1);
     expect(new Set(rsids).size).toBe(1);
     expect(rsids[0]).toMatch(HEX_ID);
+  });
+
+  it("PC: insertOoxmlAfter with a multi-paragraph fragment only mark-shifts the FIRST inserted paragraph", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML, "PC");
+    const target = realParagraphs(doc)[0]!;
+    const originalTargetId = paraId(target);
+    const fragment = `<?xml version="1.0" encoding="UTF-8"?>
+<pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">
+  <pkg:part pkg:name="/word/document.xml" pkg:contentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml">
+    <pkg:xmlData>
+      <w:document xmlns:w="${W_NS}">
+        <w:body>
+          <w:p><w:r><w:t>Frag one.</w:t></w:r></w:p>
+          <w:p><w:r><w:t>Frag two.</w:t></w:r></w:p>
+        </w:body>
+      </w:document>
+    </pkg:xmlData>
+  </pkg:part>
+</pkg:package>`;
+
+    const [fragOne, fragTwo] = doc.insertOoxmlAfter(target, fragment);
+
+    // The paragraph adjacent to the anchor inherits its old id...
+    expect(paraId(fragOne!)).toBe(originalTargetId);
+    expect(paraId(target)).not.toBe(originalTargetId);
+    // ...the second fragment paragraph just keeps its own freshly-generated
+    // id — no shift, since only a single-paragraph insert-after is confirmed.
+    expect(paraId(fragTwo!)).not.toBe(originalTargetId);
+    expect(paraId(fragTwo!)).toMatch(HEX_ID);
   });
 
   it("OfficeOnline: mark-shift is not applied on insert-after — ids churn unconditionally on the next getOoxml() call anyway", () => {

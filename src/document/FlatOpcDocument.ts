@@ -1,8 +1,8 @@
-import { DOMParser, XMLSerializer, type Document, type Element } from "@xmldom/xmldom";
-import { SupportedPlatform } from "../office/context";
+import { DOMParser, XMLSerializer, type Document, type Element, type Node } from "@xmldom/xmldom";
+import { type SupportedPlatform } from "../office/context";
 import {
   applyInsertAfterMarkShift,
-  assignFreshParaId,
+  assignFreshIds,
   regenerateAllIdsForOfficeOnline,
 } from "../word/paraId";
 
@@ -114,8 +114,20 @@ export class FlatOpcDocument {
   private createParagraph(text: string): Element {
     const paragraph = this.xmlDoc.createElementNS(W_NS, "w:p");
     paragraph.appendChild(this.createRun(text));
-    assignFreshParaId(paragraph);
+    assignFreshIds(paragraph);
     return paragraph;
+  }
+
+  // Splices `node` immediately after `anchor` within `parent` — shared by
+  // insertParagraphAfter and insertOoxmlAfter, which both do "insert after"
+  // splicing, once for a single paragraph and once looped for a fragment's
+  // paragraphs.
+  private insertNodeAfterAnchor(parent: Node, anchor: Node, node: Element): void {
+    if (anchor.nextSibling) {
+      parent.insertBefore(node, anchor.nextSibling);
+    } else {
+      parent.appendChild(node);
+    }
   }
 
   appendParagraph(text: string): Element {
@@ -140,11 +152,7 @@ export class FlatOpcDocument {
     if (!parent) {
       throw new Error("FlatOpcDocument.insertParagraphAfter: target has no parent");
     }
-    if (target.nextSibling) {
-      parent.insertBefore(paragraph, target.nextSibling);
-    } else {
-      parent.appendChild(paragraph);
-    }
+    this.insertNodeAfterAnchor(parent, target, paragraph);
     return paragraph;
   }
 
@@ -200,7 +208,7 @@ export class FlatOpcDocument {
     const sourceParagraphs = fragmentDoc.getRealParagraphs();
     return sourceParagraphs.map((p) => {
       const imported = this.xmlDoc.importNode(p, true);
-      assignFreshParaId(imported);
+      assignFreshIds(imported);
       return imported;
     });
   }
@@ -222,16 +230,16 @@ export class FlatOpcDocument {
     if (!parent) {
       throw new Error("FlatOpcDocument.insertOoxmlAfter: target has no parent");
     }
+    // Only the paragraph immediately adjacent to the anchor mark-shifts —
+    // the confirmed evidence (ticket 006) only covers a single inserted
+    // paragraph; extending that to paragraphs 2+ of a multi-paragraph
+    // fragment would be an unconfirmed guess, not a modeled behavior.
     if (nodes[0]) {
       applyInsertAfterMarkShift(this.platform, target, nodes[0]);
     }
     let anchor: Element = target;
     for (const node of nodes) {
-      if (anchor.nextSibling) {
-        parent.insertBefore(node, anchor.nextSibling);
-      } else {
-        parent.appendChild(node);
-      }
+      this.insertNodeAfterAnchor(parent, anchor, node);
       anchor = node;
     }
     return nodes;
@@ -292,7 +300,7 @@ export class FlatOpcDocument {
     } else {
       // PC/Mac: real content stays stable across reads — only the trailing
       // mark churns, on every single call, regardless of edits.
-      assignFreshParaId(this.trailingMark);
+      assignFreshIds(this.trailingMark);
     }
     return new XMLSerializer().serializeToString(this.xmlDoc);
   }
