@@ -294,22 +294,22 @@ export class FlatOpcDocument {
     return paragraphText(paragraph);
   }
 
-  // Shared by getOoxml() and getRangeOoxml() — every read-path serialization,
-  // whole-document or range-scoped, applies the same platform-driven id churn
-  // (design spec's "ParaId stability model": "every getOoxml() call — on Body
-  // or any Range — regenerates fresh ids ... for the whole document").
-  private applyReadTimeIdChurn(): void {
-    if (this.platform === "OfficeOnline") {
-      regenerateAllIdsForOfficeOnline([...this.getRealParagraphs(), this.trailingMark]);
-    } else {
-      // PC/Mac: real content stays stable across reads — only the trailing
-      // mark churns, on every single call, regardless of edits.
-      assignFreshIds(this.trailingMark);
-    }
+  // Shared by getOoxml() and getRangeOoxml() — the design spec's "ParaId
+  // stability model" is explicit that OfficeOnline regenerates ids "for the
+  // whole document" on "Body or any Range" reads alike.
+  private churnIdsForOfficeOnlineRead(): void {
+    regenerateAllIdsForOfficeOnline([...this.getRealParagraphs(), this.trailingMark]);
   }
 
   getOoxml(): string {
-    this.applyReadTimeIdChurn();
+    if (this.platform === "OfficeOnline") {
+      this.churnIdsForOfficeOnlineRead();
+    } else {
+      // PC/Mac: real content stays stable across whole-document reads —
+      // only the trailing mark churns, on every single call, regardless of
+      // edits.
+      assignFreshIds(this.trailingMark);
+    }
     return new XMLSerializer().serializeToString(this.xmlDoc);
   }
 
@@ -320,8 +320,17 @@ export class FlatOpcDocument {
   // when a subtree is serialized outside its full ancestor chain), so the
   // wrapper only needs to declare the main `w:` namespace for its own
   // <w:document>/<w:body> elements.
+  //
+  // No PC/Mac trailing-mark churn here, unlike getOoxml(): the mark is never
+  // part of a range-scoped fragment's output, so churning it would be a
+  // side effect with no observable justification — the spec's "churns every
+  // call" language describes Body's whole-document reads specifically, and
+  // extending it to scoped Range reads would be an unconfirmed guess, not a
+  // modeled behavior (same caution as paraId.ts's rsid omission).
   getRangeOoxml(target: Element): string {
-    this.applyReadTimeIdChurn();
+    if (this.platform === "OfficeOnline") {
+      this.churnIdsForOfficeOnlineRead();
+    }
     const targetXml = new XMLSerializer().serializeToString(target);
     return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <pkg:package xmlns:pkg="http://schemas.microsoft.com/office/2006/xmlPackage">

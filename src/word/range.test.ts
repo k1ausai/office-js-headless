@@ -182,7 +182,15 @@ describe("Range core operations", () => {
     const target = firstParagraph(doc);
     const range = new Range(doc, target, "PC", immediateEnqueue);
 
-    for (const location of ["Whole", "Start", "End", "After", "Content", undefined] as const) {
+    for (const location of [
+      "Whole",
+      "Start",
+      "End",
+      "Before",
+      "After",
+      "Content",
+      undefined,
+    ] as const) {
       const subRange = range.getRange(location);
       subRange.insertText("PREPENDED ", InsertLocation.start);
       expect(doc.getParagraphText(target)).toContain("PREPENDED");
