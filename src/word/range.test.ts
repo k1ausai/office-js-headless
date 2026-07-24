@@ -177,6 +177,29 @@ describe("Range core operations", () => {
     }
   });
 
+  it("search returns this range's own Range when its paragraph matches, an empty array otherwise", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    doc.appendParagraph("Other paragraph.");
+    const target = firstParagraph(doc);
+    const range = new Range(doc, target, "PC", immediateEnqueue);
+
+    const matches = range.search("Seed");
+    expect(matches).toHaveLength(1);
+    expect(doc.getParagraphText(target)).toBe("Seed paragraph.");
+
+    expect(range.search("Other")).toEqual([]);
+  });
+
+  it("search respects matchCase, defaulting to false", () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    const target = firstParagraph(doc);
+    const range = new Range(doc, target, "PC", immediateEnqueue);
+
+    expect(range.search("SEED")).toHaveLength(1);
+    expect(range.search("SEED", { matchCase: true })).toHaveLength(0);
+    expect(range.search("Seed", { matchCase: true })).toHaveLength(1);
+  });
+
   it("getRange returns a new Range wrapping the same paragraph, for every rangeLocation — whole-paragraph granularity has no sub-position to distinguish", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
     const target = firstParagraph(doc);
