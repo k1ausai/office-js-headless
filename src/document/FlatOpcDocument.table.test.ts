@@ -4,6 +4,7 @@ import { MERGED_TABLE_SEED_OOXML, TABLE_SEED_OOXML } from "./__fixtures__/tableS
 import { FlatOpcDocument } from "./FlatOpcDocument";
 
 const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+const W14_NS = "http://schemas.microsoft.com/office/word/2010/wordml";
 
 function firstTable(doc: FlatOpcDocument): Element {
   const table = doc.bodyElement.getElementsByTagNameNS(W_NS, "tbl")[0];
@@ -135,5 +136,19 @@ describe("FlatOpcDocument table primitives", () => {
     const ooxml = doc.getOoxml();
     expect(ooxml).not.toContain("w:tblPr");
     expect(ooxml).not.toContain("w:trPr");
+  });
+
+  it("OfficeOnline's paraId churn reaches paragraphs nested inside table cells, not just body-level ones", () => {
+    const doc = new FlatOpcDocument(TABLE_SEED_OOXML, "OfficeOnline");
+    const cell = doc.getRowCells(doc.getTableRows(firstTable(doc))[0]!)[0]!;
+    const cellParagraph = cell.getElementsByTagNameNS(W_NS, "p")[0]!;
+
+    doc.getOoxml();
+    const idAfterFirstCall = cellParagraph.getAttributeNS(W14_NS, "paraId");
+    expect(idAfterFirstCall).toMatch(/^[0-9A-F]{8}$/);
+
+    doc.getOoxml();
+    const idAfterSecondCall = cellParagraph.getAttributeNS(W14_NS, "paraId");
+    expect(idAfterSecondCall).not.toBe(idAfterFirstCall);
   });
 });

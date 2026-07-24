@@ -1,6 +1,5 @@
 import { type Element } from "@xmldom/xmldom";
 import { FlatOpcDocument } from "../document/FlatOpcDocument";
-import { SupportedPlatform } from "../office/context";
 import { richApiError } from "./errors";
 import { TrackedProperties } from "./proxy";
 import type { QueuedOperation, Syncable } from "./run";
@@ -18,15 +17,18 @@ function itemNotFoundError(): Error {
 // returns a TableRowCollection synchronously, but this shim doesn't model
 // insert-method return values anywhere else either (established in #9-#12),
 // so staying void here keeps Table consistent with that precedent rather
-// than introducing a one-off exception.
+// than introducing a one-off exception. No `platform` field: unlike
+// Range/Paragraph, nothing here has a platform-conditional behavior (no
+// insertOoxml-style gating, no getRange()) — carrying it unused would be
+// speculative generality, not precedent-following.
 export class Table implements Syncable {
   private readonly tracked = new TrackedProperties();
 
   constructor(
     private readonly doc: FlatOpcDocument,
     private readonly target: Element,
-    private readonly platform: SupportedPlatform,
-    private readonly enqueue: (op: QueuedOperation) => void
+    private readonly enqueue: (op: QueuedOperation) => void,
+    private readonly registerSyncable: (obj: Syncable) => void
   ) {}
 
   load(propertyNames: TableProperty | TableProperty[]): void {
@@ -61,7 +63,7 @@ export class Table implements Syncable {
     const rows = this.doc.getTableRows(this.target);
     const row = rows[rowIndex];
     if (!row) throw itemNotFoundError();
-    return new TableRow(this.doc, row, this.platform, this.enqueue);
+    return new TableRow(this.doc, row, this.enqueue, this.registerSyncable);
   }
 
   getCell(rowIndex: number, cellIndex: number): TableCell {
@@ -75,19 +77,24 @@ export class Table implements Syncable {
   }
 }
 
+// Not itself Syncable (no gated properties of its own) — exists purely to
+// resolve a specific row's cells, forwarding registerSyncable so cells it
+// creates can register themselves.
 export class TableRow {
   constructor(
     private readonly doc: FlatOpcDocument,
     private readonly target: Element,
-    private readonly platform: SupportedPlatform,
-    private readonly enqueue: (op: QueuedOperation) => void
+    private readonly enqueue: (op: QueuedOperation) => void,
+    private readonly registerSyncable: (obj: Syncable) => void
   ) {}
 
   getCell(cellIndex: number): TableCell {
     const cells = this.doc.getRowCells(this.target);
     const cell = cells[cellIndex];
     if (!cell) throw itemNotFoundError();
-    return new TableCell(this.doc, cell, this.platform, this.enqueue);
+    const tableCell = new TableCell(this.doc, cell, this.enqueue);
+    this.registerSyncable(tableCell);
+    return tableCell;
   }
 }
 
@@ -97,7 +104,6 @@ export class TableCell implements Syncable {
   constructor(
     private readonly doc: FlatOpcDocument,
     private readonly target: Element,
-    private readonly platform: SupportedPlatform,
     private readonly enqueue: (op: QueuedOperation) => void
   ) {}
 

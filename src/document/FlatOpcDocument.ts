@@ -96,9 +96,24 @@ export class FlatOpcDocument {
   }
 
   // Direct-child <w:p> elements that represent real, user-visible content —
-  // excludes the trailing mark, matching what body.paragraphs reports.
+  // excludes the trailing mark, matching what body.paragraphs reports. Does
+  // NOT include paragraphs nested inside table cells — see getAllParagraphs().
   private getRealParagraphs(): Element[] {
     return findDirectChildElementsNS(this.bodyElement, W_NS, "p").filter(
+      (p) => p !== this.trailingMark
+    );
+  }
+
+  // Every <w:p> anywhere under <w:body>, including ones nested inside table
+  // cells — excludes the trailing mark. Unlike getRealParagraphs() (direct
+  // children only, matching what body.paragraphs reports), this is for
+  // whole-document operations that must reach every paragraph regardless of
+  // nesting: OfficeOnline's paraId churn is one such case (see
+  // churnIdsForOfficeOnlineRead()) — the spec's "every getOoxml() call...
+  // regenerates fresh ids... for the whole document" doesn't carve out an
+  // exception for paragraphs that happen to live inside a table.
+  private getAllParagraphs(): Element[] {
+    return Array.from(this.bodyElement.getElementsByTagNameNS(W_NS, "p")).filter(
       (p) => p !== this.trailingMark
     );
   }
@@ -298,7 +313,7 @@ export class FlatOpcDocument {
   // stability model" is explicit that OfficeOnline regenerates ids "for the
   // whole document" on "Body or any Range" reads alike.
   private churnIdsForOfficeOnlineRead(): void {
-    regenerateAllIdsForOfficeOnline([...this.getRealParagraphs(), this.trailingMark]);
+    regenerateAllIdsForOfficeOnline([...this.getAllParagraphs(), this.trailingMark]);
   }
 
   getOoxml(): string {
@@ -366,6 +381,12 @@ export class FlatOpcDocument {
     return this.getRealParagraphs();
   }
 
+  // Direct-child <w:tbl> elements — for Body.tables (TableCollection) to
+  // enumerate, mirroring getParagraphElements()'s role for body.paragraphs.
+  getTableElements(): Element[] {
+    return findDirectChildElementsNS(this.bodyElement, W_NS, "tbl");
+  }
+
   // Design spec's "Core document model" lists `search(pattern)` as one of
   // FlatOpcDocument's primitives, alongside insertAt/deleteNode. Plain
   // substring matching only (issue #13: wildcard syntax and other
@@ -373,8 +394,9 @@ export class FlatOpcDocument {
   // regex/pattern interpretation, so wildcard-special characters in
   // `searchText` are always matched literally, never silently
   // misinterpreted. Only searches direct-child body paragraphs, same scope
-  // as getRealParagraphs() — table-cell paragraphs aren't reachable until
-  // Tables (#15) exist to model them.
+  // as getRealParagraphs() — table-cell paragraphs are out of scope (#13
+  // predates Tables (#15); extending search() into table cells isn't asked
+  // for by either issue).
   search(searchText: string, matchCase: boolean): Element[] {
     return this.getRealParagraphs().filter((p) => {
       const text = paragraphText(p);
@@ -419,11 +441,15 @@ export class FlatOpcDocument {
     return paragraph;
   }
 
+  private findCellPropertyChild(cell: Element, localName: string): Element | null {
+    const tcPr = findDirectChildElementNS(cell, W_NS, "tcPr");
+    return tcPr && findDirectChildElementNS(tcPr, W_NS, localName);
+  }
+
   // w:gridSpan absent means "spans exactly 1 grid column" (ECMA-376
   // §17.4.17) — not a merge.
   getCellGridSpan(cell: Element): number {
-    const tcPr = findDirectChildElementNS(cell, W_NS, "tcPr");
-    const gridSpan = tcPr && findDirectChildElementNS(tcPr, W_NS, "gridSpan");
+    const gridSpan = this.findCellPropertyChild(cell, "gridSpan");
     const val = gridSpan?.getAttributeNS(W_NS, "val");
     return val ? Number.parseInt(val, 10) : 1;
   }
@@ -432,8 +458,7 @@ export class FlatOpcDocument {
   // (ECMA-376 §17.4.86) — distinct from the element being entirely absent
   // (no merge at all).
   getCellVMerge(cell: Element): "Continue" | "Restart" | undefined {
-    const tcPr = findDirectChildElementNS(cell, W_NS, "tcPr");
-    const vMerge = tcPr && findDirectChildElementNS(tcPr, W_NS, "vMerge");
+    const vMerge = this.findCellPropertyChild(cell, "vMerge");
     if (!vMerge) return undefined;
     const val = vMerge.getAttributeNS(W_NS, "val");
     return val === "restart" ? "Restart" : "Continue";

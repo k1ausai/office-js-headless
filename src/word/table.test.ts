@@ -16,10 +16,12 @@ function immediateEnqueue(op: () => void): void {
   op();
 }
 
+function noopRegisterSyncable(): void {}
+
 describe("Table", () => {
   it("rowCount/columnCount respect load/sync gating, like Body.text", () => {
     const doc = new FlatOpcDocument(TABLE_SEED_OOXML);
-    const table = new Table(doc, firstTable(doc), "PC", immediateEnqueue);
+    const table = new Table(doc, firstTable(doc), immediateEnqueue, noopRegisterSyncable);
 
     expect(() => table.rowCount).toThrow(/PropertyNotLoaded|not available/);
 
@@ -33,7 +35,7 @@ describe("Table", () => {
 
   it("columnCount reflects w:tblGrid even for a table with a horizontally-merged row", () => {
     const doc = new FlatOpcDocument(MERGED_TABLE_SEED_OOXML);
-    const table = new Table(doc, firstTable(doc), "PC", immediateEnqueue);
+    const table = new Table(doc, firstTable(doc), immediateEnqueue, noopRegisterSyncable);
     table.load(["rowCount", "columnCount"]);
     table.sync();
     expect(table.rowCount).toBe(2);
@@ -42,7 +44,7 @@ describe("Table", () => {
 
   it("getCell reads/writes the correct cell's text", () => {
     const doc = new FlatOpcDocument(TABLE_SEED_OOXML);
-    const table = new Table(doc, firstTable(doc), "PC", immediateEnqueue);
+    const table = new Table(doc, firstTable(doc), immediateEnqueue, noopRegisterSyncable);
 
     const cell = table.getCell(1, 2);
     cell.load("value");
@@ -57,7 +59,7 @@ describe("Table", () => {
 
   it("getCell throws ItemNotFound for an out-of-range row or cell index", () => {
     const doc = new FlatOpcDocument(TABLE_SEED_OOXML);
-    const table = new Table(doc, firstTable(doc), "PC", immediateEnqueue);
+    const table = new Table(doc, firstTable(doc), immediateEnqueue, noopRegisterSyncable);
 
     expect(() => table.getCell(99, 0)).toThrow(/not found/);
     expect(() => table.getCell(0, 99)).toThrow(/not found/);
@@ -65,7 +67,7 @@ describe("Table", () => {
 
   it("getRow returns a TableRow that can resolve its own cells", () => {
     const doc = new FlatOpcDocument(TABLE_SEED_OOXML);
-    const table = new Table(doc, firstTable(doc), "PC", immediateEnqueue);
+    const table = new Table(doc, firstTable(doc), immediateEnqueue, noopRegisterSyncable);
 
     const row = table.getRow(0);
     const cell = row.getCell(1);
@@ -76,7 +78,7 @@ describe("Table", () => {
 
   it("a cell's gridSpan/vMerge are readable without load/sync — plain structural reads", () => {
     const doc = new FlatOpcDocument(MERGED_TABLE_SEED_OOXML);
-    const table = new Table(doc, firstTable(doc), "PC", immediateEnqueue);
+    const table = new Table(doc, firstTable(doc), immediateEnqueue, noopRegisterSyncable);
 
     const topCell = table.getCell(0, 0);
     expect(topCell.gridSpan).toBe(2);
@@ -95,7 +97,7 @@ describe("Table", () => {
     const doc = new FlatOpcDocument(TABLE_SEED_OOXML);
     const target = firstTable(doc);
     const queue: Array<() => void> = [];
-    const table = new Table(doc, target, "PC", (op) => queue.push(op));
+    const table = new Table(doc, target, (op) => queue.push(op), noopRegisterSyncable);
 
     table.addRows("End", 1, [["A", "B", "C"]]);
     expect(doc.getTableRows(target)).toHaveLength(2);
