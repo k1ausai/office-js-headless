@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { FlatOpcDocument } from "../document/FlatOpcDocument";
 import { MINIMAL_SEED_OOXML } from "../document/__fixtures__/minimalSeed";
+import { TABLE_SEED_OOXML } from "../document/__fixtures__/tableSeed";
 import { InsertLocation } from "./insertLocation";
 import { wordRun } from "./run";
 
@@ -115,6 +116,32 @@ describe("Body.paragraphs", () => {
 
       expect(first.text).toBe("Seed paragraph.");
       expect(last.text).toBe("Second.");
+    });
+  });
+});
+
+describe("Body.tables", () => {
+  it("getFirst is reachable end-to-end through Word.run and reflects the current document", async () => {
+    const doc = new FlatOpcDocument(TABLE_SEED_OOXML);
+    await wordRun(doc, "PC", async (context) => {
+      const table = context.document.body.tables.getFirst();
+      table.load(["rowCount", "columnCount"]);
+      await context.sync();
+
+      expect(table.rowCount).toBe(2);
+      expect(table.columnCount).toBe(3);
+
+      const cell = table.getCell(0, 0);
+      cell.load("value");
+      await context.sync();
+      expect(cell.value).toBe("R1C1");
+    });
+  });
+
+  it("getFirst throws ItemNotFound when the document has no tables", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, "PC", async (context) => {
+      expect(() => context.document.body.tables.getFirst()).toThrow(/not found/);
     });
   });
 });

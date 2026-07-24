@@ -13,6 +13,7 @@ import { TrackedProperties } from "./proxy";
 import { Range } from "./range";
 import type { QueuedOperation, Syncable } from "./run";
 import { SearchOptions } from "./searchOptions";
+import { TableCollection } from "./tableCollection";
 
 type BodyProperty = "text";
 type LocationHandler = (doc: FlatOpcDocument, text: string) => void;
@@ -97,6 +98,10 @@ export class Body {
 
   get paragraphs(): ParagraphCollection {
     return new ParagraphCollection(this.doc, this.platform, this.enqueue, this.registerSyncable);
+  }
+
+  get tables(): TableCollection {
+    return new TableCollection(this.doc, this.enqueue, this.registerSyncable);
   }
 
   load(propertyNames: BodyProperty | BodyProperty[]): void {
