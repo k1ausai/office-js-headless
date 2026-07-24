@@ -14,7 +14,6 @@ import { TrackedProperties } from "./proxy";
 import { Range } from "./range";
 import type { QueuedOperation, Syncable } from "./run";
 import { SearchOptions } from "./searchOptions";
-import { Style } from "./style";
 import { TableCollection } from "./tableCollection";
 
 type BodyProperty = "text";
@@ -115,15 +114,6 @@ export class Body {
       const comment = new Comment(this.doc, c);
       this.registerSyncable(comment);
       return comment;
-    });
-  }
-
-  // Synchronous, like getComments() — a query, not a mutation.
-  getStyles(): Style[] {
-    return this.doc.getStyleElements().map((s) => {
-      const style = new Style(this.doc, s);
-      this.registerSyncable(style);
-      return style;
     });
   }
 

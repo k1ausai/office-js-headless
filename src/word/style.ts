@@ -1,5 +1,5 @@
 import { type Element } from "@xmldom/xmldom";
-import { FlatOpcDocument } from "../document/FlatOpcDocument";
+import { FlatOpcDocument, type StyleType } from "../document/FlatOpcDocument";
 import { TrackedProperties } from "./proxy";
 import type { Syncable } from "./run";
 
@@ -20,10 +20,17 @@ export class Style implements Syncable {
     this.tracked.load(propertyNames);
   }
 
-  // The stable OOXML identifier (w:styleId). Real Word's built-in styles
-  // use exactly the Word.BuiltInStyleName enum's string values as their
-  // styleId (e.g. "Heading1") — comparing `style.id` against
-  // Word.BuiltInStyleName.heading1 works without any separate lookup.
+  // A shim-only convenience, NOT a mirrored real property — real
+  // Word.Style has no readable id/styleId at all (confirmed against the
+  // real API surface; its scalar properties are nameLocal/type/builtIn/
+  // priority/... and similar, nothing identifier-shaped). Real add-in code
+  // resolves a Word.BuiltInStyleName value via
+  // StyleCollection.getByName(...), a lookup, never by reading an id back
+  // off an already-obtained Style. Exposed here anyway since it's the raw
+  // w:styleId this shim already has on hand, and real Word's built-in
+  // w:styleId values happen to equal the BuiltInStyleName enum's strings
+  // (e.g. "Heading1") — useful for tests, but don't mistake it for API
+  // parity.
   get id(): string {
     return this.tracked.read<string>("id");
   }
@@ -32,8 +39,8 @@ export class Style implements Syncable {
     return this.tracked.read<string>("nameLocal");
   }
 
-  get type(): "Paragraph" | "Character" | "Table" | "List" {
-    return this.tracked.read<"Paragraph" | "Character" | "Table" | "List">("type");
+  get type(): StyleType {
+    return this.tracked.read<StyleType>("type");
   }
 
   get builtIn(): boolean {

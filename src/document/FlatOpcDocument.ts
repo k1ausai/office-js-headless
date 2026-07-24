@@ -12,6 +12,10 @@ const W15_NS = "http://schemas.microsoft.com/office/word/2012/wordml";
 const PKG_NS = "http://schemas.microsoft.com/office/2006/xmlPackage";
 const ELEMENT_NODE = 1;
 
+// Matches real Word.StyleType's string values. Shared with word/style.ts's
+// Style.type, rather than each side declaring its own copy of this union.
+export type StyleType = "Paragraph" | "Character" | "Table" | "List";
+
 // Subtree search — fine for locating the single <w:body> nested under
 // <pkg:package>/<pkg:part>/<pkg:xmlData>/<w:document>, since a document.xml
 // part has exactly one <w:body>.
@@ -506,7 +510,7 @@ export class FlatOpcDocument {
     return name?.getAttributeNS(W_NS, "val") ?? "";
   }
 
-  getStyleType(style: Element): "Paragraph" | "Character" | "Table" | "List" {
+  getStyleType(style: Element): StyleType {
     const type = style.getAttributeNS(W_NS, "type");
     switch (type) {
       case "character":
