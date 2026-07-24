@@ -58,6 +58,35 @@ describe("Body InsertLocation dispatch", () => {
   });
 });
 
+describe("Body.search", () => {
+  it("returns a Range for each paragraph whose text contains the search string", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, "PC", async (context) => {
+      context.document.body.insertParagraph("Another paragraph.", InsertLocation.end);
+      await context.sync();
+
+      const results = context.document.body.search("paragraph");
+      expect(results).toHaveLength(2);
+    });
+  });
+
+  it("matchCase defaults to false, and respects matchCase: true", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, "PC", async (context) => {
+      expect(context.document.body.search("SEED")).toHaveLength(1);
+      expect(context.document.body.search("SEED", { matchCase: true })).toHaveLength(0);
+      expect(context.document.body.search("Seed", { matchCase: true })).toHaveLength(1);
+    });
+  });
+
+  it("returns an empty array when nothing matches", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, "PC", async (context) => {
+      expect(context.document.body.search("nonexistent")).toEqual([]);
+    });
+  });
+});
+
 describe("Body load/sync gating", () => {
   it("reading .text without calling .load() first throws PropertyNotLoaded", async () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);

@@ -360,6 +360,19 @@ export class FlatOpcDocument {
     return this.getRealParagraphs().map(paragraphText).join("\n");
   }
 
+  // Design spec's "Core document model" lists `search(pattern)` as one of
+  // FlatOpcDocument's primitives, alongside insertAt/deleteNode. Plain
+  // substring matching only (issue #13: wildcard syntax and other
+  // SearchOptions fields are explicitly out of scope for v1) — never
+  // regex/pattern interpretation, so wildcard-special characters in `text`
+  // are always matched literally, never silently misinterpreted.
+  search(text: string, matchCase: boolean): Element[] {
+    return this.getRealParagraphs().filter((p) => {
+      const text_ = paragraphText(p);
+      return matchCase ? text_.includes(text) : text_.toLowerCase().includes(text.toLowerCase());
+    });
+  }
+
   reset(): void {
     this.xmlDoc = new DOMParser().parseFromString(this.seedOoxml, "text/xml");
     this.ensureTrailingMark();

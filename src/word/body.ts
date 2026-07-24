@@ -9,7 +9,9 @@ import { bodyReplace } from "../operations/bodyReplace";
 import { assertOoxmlSupported } from "./errors";
 import { InsertLocation, InsertLocationValue } from "./insertLocation";
 import { TrackedProperties } from "./proxy";
+import { Range } from "./range";
 import type { QueuedOperation } from "./run";
+import { SearchOptions } from "./searchOptions";
 
 type BodyProperty = "text";
 type LocationHandler = (doc: FlatOpcDocument, text: string) => void;
@@ -83,6 +85,13 @@ export class Body {
 
   getOoxml(): string {
     return this.doc.getOoxml();
+  }
+
+  // Synchronous, like Range.getRange() — a query, not a mutation.
+  search(text: string, options?: SearchOptions): Range[] {
+    return this.doc
+      .search(text, options?.matchCase ?? false)
+      .map((p) => new Range(this.doc, p, this.platform, this.enqueue));
   }
 
   load(propertyNames: BodyProperty | BodyProperty[]): void {

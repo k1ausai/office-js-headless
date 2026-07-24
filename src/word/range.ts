@@ -17,6 +17,7 @@ import { assertOoxmlSupported } from "./errors";
 import { InsertLocation, InsertLocationValue } from "./insertLocation";
 import { RangeLocation, RangeLocationValue } from "./rangeLocation";
 import type { QueuedOperation } from "./run";
+import { SearchOptions } from "./searchOptions";
 import { SelectionMode, SelectionModeValue } from "./selectionMode";
 
 type LocationHandler = (doc: FlatOpcDocument, target: Element, text: string) => void;
@@ -104,6 +105,18 @@ export class Range {
   // wrong, just not as precise as real Word's character-level cursor.
   getRange(_rangeLocation: RangeLocationValue = RangeLocation.whole): Range {
     return new Range(this.doc, this.target, this.platform, this.enqueue);
+  }
+
+  // Synchronous, like getRange() — a query, not a mutation, matching real
+  // Office.js's proxy-factory methods. Whole-paragraph granularity means
+  // this range can match at most once (itself, if its own paragraph
+  // contains `text`) — a real sub-paragraph Range could return several
+  // matches within one paragraph, which isn't representable here.
+  search(text: string, options?: SearchOptions): Range[] {
+    return this.doc
+      .search(text, options?.matchCase ?? false)
+      .filter((p) => p === this.target)
+      .map((p) => new Range(this.doc, p, this.platform, this.enqueue));
   }
 
   private insert(

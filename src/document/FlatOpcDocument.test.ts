@@ -322,4 +322,44 @@ describe("FlatOpcDocument", () => {
 
     expect(firstRead.match(paraIdPattern)?.[1]).not.toBe(secondRead.match(paraIdPattern)?.[1]);
   });
+
+  describe("search", () => {
+    it("returns the paragraphs whose text contains the search string, case-insensitively by default", () => {
+      const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+      doc.appendParagraph("Another one.");
+
+      const matches = doc.search("SEED", false);
+
+      expect(matches).toHaveLength(1);
+      expect(doc.getParagraphText(matches[0]!)).toBe("Seed paragraph.");
+    });
+
+    it("matchCase: true only matches on exact case", () => {
+      const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+
+      expect(doc.search("SEED", true)).toHaveLength(0);
+      expect(doc.search("Seed", true)).toHaveLength(1);
+    });
+
+    it("returns no matches when the text isn't found anywhere", () => {
+      const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+      expect(doc.search("nonexistent", false)).toHaveLength(0);
+    });
+
+    it("treats wildcard-special characters in the search text literally, never as a pattern", () => {
+      const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+      doc.replaceParagraphContent(firstParagraph(doc), "Contains * and ? and .* literally.");
+
+      expect(doc.search("* and ?", false)).toHaveLength(1);
+      // A regex-as-pattern interpretation of ".*" would match everything;
+      // plain substring matching must not.
+      expect(doc.search(".*", false)).toHaveLength(1);
+      expect(doc.search("nomatch.*", false)).toHaveLength(0);
+    });
+
+    it("excludes the trailing paragraph mark from search results — it's not real content", () => {
+      const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+      expect(doc.search("", false).length).toBe(1);
+    });
+  });
 });
