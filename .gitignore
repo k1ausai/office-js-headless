@@ -3,6 +3,9 @@ dist
 coverage
 *.log
 
+# Claude Code local state (agent worktrees, etc.)
+.claude/
+
 # Environment variables
 .env
 .env.local
