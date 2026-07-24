@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { COMMENT_SEED_OOXML } from "../document/__fixtures__/commentSeed";
 import { FlatOpcDocument } from "../document/FlatOpcDocument";
 import { MINIMAL_SEED_OOXML } from "../document/__fixtures__/minimalSeed";
 import { TABLE_SEED_OOXML } from "../document/__fixtures__/tableSeed";
@@ -142,6 +143,35 @@ describe("Body.tables", () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
     await wordRun(doc, "PC", async (context) => {
       expect(() => context.document.body.tables.getFirst()).toThrow(/not found/);
+    });
+  });
+});
+
+describe("Body.getComments", () => {
+  it("returns top-level comments (with threaded replies nested via .replies), reachable end-to-end through Word.run", async () => {
+    const doc = new FlatOpcDocument(COMMENT_SEED_OOXML);
+    await wordRun(doc, "PC", async (context) => {
+      const comments = context.document.body.getComments();
+      expect(comments).toHaveLength(2);
+
+      comments.forEach((c) => c.load(["authorName", "content", "resolved", "replies"]));
+      await context.sync();
+
+      const [resolvedComment, unresolvedComment] = comments;
+      expect(resolvedComment!.authorName).toBe("Jane Doe");
+      expect(resolvedComment!.resolved).toBe(true);
+      expect(resolvedComment!.replies).toHaveLength(1);
+      expect(resolvedComment!.replies[0]).toMatchObject({ authorName: "John Smith" });
+
+      expect(unresolvedComment!.resolved).toBe(false);
+      expect(unresolvedComment!.replies).toEqual([]);
+    });
+  });
+
+  it("returns an empty array for a document with no comments", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+    await wordRun(doc, "PC", async (context) => {
+      expect(context.document.body.getComments()).toEqual([]);
     });
   });
 });

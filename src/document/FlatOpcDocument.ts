@@ -7,6 +7,9 @@ import {
 } from "../word/paraId";
 
 const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+const W14_NS = "http://schemas.microsoft.com/office/word/2010/wordml";
+const W15_NS = "http://schemas.microsoft.com/office/word/2012/wordml";
+const PKG_NS = "http://schemas.microsoft.com/office/2006/xmlPackage";
 const ELEMENT_NODE = 1;
 
 // Subtree search — fine for locating the single <w:body> nested under
@@ -42,6 +45,24 @@ function findDirectChildElementsNS(
     }
   }
   return result;
+}
+
+// Locates a named part (e.g. "/word/comments.xml") among the package's
+// <pkg:part> siblings and returns its <pkg:xmlData>'s single root element —
+// design spec's "Core document model": "lazily locate comments.xml/
+// styles.xml/numbering.xml parts if present". Returns null if the part
+// doesn't exist (a document with no comments has no comments.xml part).
+function findPartRoot(pkg: Document, partName: string): Element | null {
+  for (const part of pkg.getElementsByTagNameNS(PKG_NS, "part")) {
+    if (part.getAttributeNS(PKG_NS, "name") !== partName) continue;
+    const xmlData = findDirectChildElementNS(part, PKG_NS, "xmlData");
+    if (!xmlData) return null;
+    for (const child of xmlData.childNodes) {
+      if (child.nodeType === ELEMENT_NODE) return child as Element;
+    }
+    return null;
+  }
+  return null;
 }
 
 // Subtree search within a single paragraph is safe — <w:t> only ever nests
@@ -385,6 +406,81 @@ export class FlatOpcDocument {
   // enumerate, mirroring getParagraphElements()'s role for body.paragraphs.
   getTableElements(): Element[] {
     return findDirectChildElementsNS(this.bodyElement, W_NS, "tbl");
+  }
+
+  private get commentsRoot(): Element | null {
+    return findPartRoot(this.xmlDoc, "/word/comments.xml");
+  }
+
+  private get commentsExtendedRoot(): Element | null {
+    return findPartRoot(this.xmlDoc, "/word/commentsExtended.xml");
+  }
+
+  // Every <w:comment> in comments.xml, document order — top-level comments
+  // and threaded replies alike (a reply is just another <w:comment> element;
+  // only its commentsExtended.xml entry distinguishes it — see
+  // getCommentReplyElements()).
+  getCommentElements(): Element[] {
+    const root = this.commentsRoot;
+    return root ? findDirectChildElementsNS(root, W_NS, "comment") : [];
+  }
+
+  getTopLevelCommentElements(): Element[] {
+    return this.getCommentElements().filter(
+      (c) => !this.findCommentExtendedEntry(c)?.getAttributeNS(W15_NS, "parentParaId")
+    );
+  }
+
+  // A reply's commentsExtended.xml entry has w15:parentParaId set to its
+  // parent's own <w:p>/@w14:paraId — threading is expressed via paragraph
+  // ids, not comment ids (ECMA-376's Word 2013+ commentsExtended extension).
+  getCommentReplyElements(comment: Element): Element[] {
+    const ownParaId = this.getCommentOwnParaId(comment);
+    if (!ownParaId) return [];
+    return this.getCommentElements().filter(
+      (c) => this.findCommentExtendedEntry(c)?.getAttributeNS(W15_NS, "parentParaId") === ownParaId
+    );
+  }
+
+  getCommentId(comment: Element): string {
+    return comment.getAttributeNS(W_NS, "id") ?? "";
+  }
+
+  getCommentAuthor(comment: Element): string {
+    return comment.getAttributeNS(W_NS, "author") ?? "";
+  }
+
+  // A comment's content nests identically to body paragraphs — reuses the
+  // same paragraph text read used everywhere else. Comments may contain
+  // multiple paragraphs; joined with "\n", same as getBodyText().
+  getCommentContent(comment: Element): string {
+    return findDirectChildElementsNS(comment, W_NS, "p").map(paragraphText).join("\n");
+  }
+
+  getCommentDate(comment: Element): Date {
+    return new Date(comment.getAttributeNS(W_NS, "date") ?? "");
+  }
+
+  // Absent commentsExtended.xml, or no matching entry, means "not resolved"
+  // — a comment with no extended metadata was never marked done.
+  getCommentResolved(comment: Element): boolean {
+    return this.findCommentExtendedEntry(comment)?.getAttributeNS(W15_NS, "done") === "1";
+  }
+
+  private getCommentOwnParaId(comment: Element): string | null {
+    const p = findDirectChildElementNS(comment, W_NS, "p");
+    return p && p.getAttributeNS(W14_NS, "paraId");
+  }
+
+  private findCommentExtendedEntry(comment: Element): Element | null {
+    const root = this.commentsExtendedRoot;
+    const ownParaId = root && this.getCommentOwnParaId(comment);
+    if (!root || !ownParaId) return null;
+    return (
+      findDirectChildElementsNS(root, W15_NS, "commentEx").find(
+        (entry) => entry.getAttributeNS(W15_NS, "paraId") === ownParaId
+      ) ?? null
+    );
   }
 
   // Design spec's "Core document model" lists `search(pattern)` as one of
