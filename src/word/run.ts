@@ -3,16 +3,32 @@ import { Body } from "./body";
 
 export type QueuedOperation = () => void;
 
+// Every shim proxy object that tracks loaded properties (Body, and later
+// Range/Paragraph/Table) implements this so RequestContext can snapshot all
+// of them after a sync()'s mutation queue runs — not just a single hardcoded
+// Body reference, since later receiver types create their own instances
+// dynamically (e.g. every body.getRange() call makes a new Range).
+export interface Syncable {
+  sync(): void;
+}
+
 export class RequestContext {
   readonly document: { body: Body };
   private readonly queue: QueuedOperation[] = [];
+  private readonly syncables: Syncable[] = [];
 
   constructor(doc: FlatOpcDocument) {
-    this.document = { body: new Body(doc, (op) => this.enqueue(op)) };
+    const body = new Body(doc, (op) => this.enqueue(op));
+    this.document = { body };
+    this.registerSyncable(body);
   }
 
   private enqueue(op: QueuedOperation): void {
     this.queue.push(op);
+  }
+
+  registerSyncable(obj: Syncable): void {
+    this.syncables.push(obj);
   }
 
   async sync(): Promise<void> {
@@ -22,6 +38,12 @@ export class RequestContext {
     const pending = this.queue.splice(0, this.queue.length);
     for (const op of pending) {
       op();
+    }
+    // Loaded properties snapshot AFTER mutations apply — real add-in code
+    // relies on load()+sync() in the same batch as a mutation seeing the
+    // post-mutation value.
+    for (const syncable of this.syncables) {
+      syncable.sync();
     }
   }
 }

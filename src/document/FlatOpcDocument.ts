@@ -17,16 +17,36 @@ function findFirstDescendantElementNS(root: Element, namespaceURI: string, local
 // lives nested inside a paragraph's <w:pPr> — a different element that isn't
 // a direct child of <w:body>, so splicing against it would throw.
 function findDirectChildElementNS(parent: Element, namespaceURI: string, localName: string) {
+  return findDirectChildElementsNS(parent, namespaceURI, localName)[0] ?? null;
+}
+
+function findDirectChildElementsNS(
+  parent: Element,
+  namespaceURI: string,
+  localName: string
+): Element[] {
+  const result: Element[] = [];
   for (const child of parent.childNodes) {
     if (
       child.nodeType === ELEMENT_NODE &&
       child.namespaceURI === namespaceURI &&
       child.localName === localName
     ) {
-      return child as Element;
+      result.push(child as Element);
     }
   }
-  return null;
+  return result;
+}
+
+// Subtree search within a single paragraph is safe — <w:t> only ever nests
+// inside that paragraph's own <w:r> children, never inside a further-nested
+// paragraph (paragraphs don't nest).
+function paragraphText(paragraph: Element): string {
+  let text = "";
+  for (const t of paragraph.getElementsByTagNameNS(W_NS, "t")) {
+    text += t.textContent ?? "";
+  }
+  return text;
 }
 
 export class FlatOpcDocument {
@@ -67,6 +87,11 @@ export class FlatOpcDocument {
 
   getOoxml(): string {
     return new XMLSerializer().serializeToString(this.xmlDoc);
+  }
+
+  getBodyText(): string {
+    const paragraphs = findDirectChildElementsNS(this.bodyElement, W_NS, "p");
+    return paragraphs.map(paragraphText).join("\n");
   }
 
   reset(): void {
