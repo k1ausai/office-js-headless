@@ -44,6 +44,17 @@ describe("wordRun / RequestContext deferred batching", () => {
     });
   });
 
+  it("body.getOoxml() (inside Word.run) reads current document state, same as the top-level escape hatch", async () => {
+    const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
+
+    await wordRun(doc, async (context) => {
+      context.document.body.insertText("Inline read.", InsertLocation.end);
+      await context.sync();
+      expect(context.document.body.getOoxml()).toContain("Inline read.");
+      expect(context.document.body.getOoxml()).toEqual(doc.getOoxml());
+    });
+  });
+
   it("clears the queue after sync() so a second sync() call is a no-op", async () => {
     const doc = new FlatOpcDocument(MINIMAL_SEED_OOXML);
 

@@ -1,10 +1,32 @@
 import { DOMParser, XMLSerializer, type Document, type Element } from "@xmldom/xmldom";
 
 const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+const ELEMENT_NODE = 1;
 
-function findFirstElementByTagNameNS(root: Element, namespaceURI: string, localName: string) {
+// Subtree search — fine for locating the single <w:body> nested under
+// <pkg:package>/<pkg:part>/<pkg:xmlData>/<w:document>, since a document.xml
+// part has exactly one <w:body>.
+function findFirstDescendantElementNS(root: Element, namespaceURI: string, localName: string) {
   const matches = root.getElementsByTagNameNS(namespaceURI, localName);
   return matches.length > 0 ? matches[0] : null;
+}
+
+// Direct-children-only search — required for locating <w:body>'s own
+// trailing <w:sectPr> (the document's section properties). A subtree search
+// here would also match a mid-document section break's <w:sectPr>, which
+// lives nested inside a paragraph's <w:pPr> — a different element that isn't
+// a direct child of <w:body>, so splicing against it would throw.
+function findDirectChildElementNS(parent: Element, namespaceURI: string, localName: string) {
+  for (const child of parent.childNodes) {
+    if (
+      child.nodeType === ELEMENT_NODE &&
+      child.namespaceURI === namespaceURI &&
+      child.localName === localName
+    ) {
+      return child as Element;
+    }
+  }
+  return null;
 }
 
 export class FlatOpcDocument {
@@ -18,7 +40,7 @@ export class FlatOpcDocument {
 
   get bodyElement(): Element {
     const root = this.xmlDoc.documentElement;
-    const body = root && findFirstElementByTagNameNS(root, W_NS, "body");
+    const body = root && findFirstDescendantElementNS(root, W_NS, "body");
     if (!body) {
       throw new Error("FlatOpcDocument: seed OOXML has no <w:body> element");
     }
@@ -34,7 +56,7 @@ export class FlatOpcDocument {
     run.appendChild(textNode);
     paragraph.appendChild(run);
 
-    const sectPr = findFirstElementByTagNameNS(body, W_NS, "sectPr");
+    const sectPr = findDirectChildElementNS(body, W_NS, "sectPr");
     if (sectPr) {
       body.insertBefore(paragraph, sectPr);
     } else {
